@@ -330,7 +330,7 @@ export default function HeroSection() {
           className="relative z-20 max-w-5xl mx-auto px-6 sm:px-10 pt-32 pb-24 flex flex-col items-center text-center will-change-transform">
 
           {/* ── Cycling Headline ──────────────────────────────── */}
-          <div className="headline-stage mb-12">
+          <div className="headline-stage mb-8">
             <h1 key={taglineIndex} className={`headline-tagline ${tClass}`}>
               <span className="block text-foreground">{current.white}</span>
               <span className="block text-gradient-gold">{current.gold}</span>
@@ -339,7 +339,7 @@ export default function HeroSection() {
 
           {/* ── Tagline dots indicator ────────────────────────── */}
           <div
-            className="flex items-center gap-2 mb-14"
+            className="flex items-center gap-2 mb-10"
             style={{
               opacity: heroVisible ? 1 : 0,
               transition: 'opacity 0.8s ease 1.4s',
@@ -366,16 +366,9 @@ export default function HeroSection() {
             }}>
             <button
               onClick={() => document.querySelector('#cta')?.scrollIntoView({ behavior: 'smooth' })}
-              className="get-started-btn group">
-              {/* Outer glow ring */}
-              <span className="btn-ring" />
-              {/* Inner shimmer layer */}
-              <span className="btn-shimmer" />
-              {/* Label */}
-              <span className="btn-label">
-                <span className="btn-arrow">→</span>
-                Get Started
-              </span>
+              className="get-started-btn">
+              Get Started
+              <span className="btn-arrow">→</span>
             </button>
           </div>
 
@@ -497,139 +490,103 @@ export default function HeroSection() {
         /* ══════════════════════════════════════════════════════════
            CYCLING HEADLINE
         ══════════════════════════════════════════════════════════ */
+
+        /*
+          The stage uses a fixed pixel height sized to always fit two
+          lines at the chosen font-size, so nothing below it jumps.
+          The tagline is absolutely positioned inside it so only it
+          animates, not the surrounding layout.
+        */
         .headline-stage {
           position: relative;
-          min-height: clamp(5rem, 16vw, 10rem); /* prevents layout jump */
-          display: flex; align-items: center; justify-content: center;
+          /* two lines × line-height + a little breathing room */
+          height: clamp(7.5rem, 18vw, 13.5rem);
           width: 100%;
+          overflow: visible;
         }
 
         .headline-tagline {
-          font-size: clamp(2.6rem, 8.5vw, 6.8rem);
+          /* Comfortable size — fits fully within the viewport */
+          font-size: clamp(2rem, 5.5vw, 4.2rem);
           font-weight: 800;
-          letter-spacing: -0.04em;
-          line-height: 0.96;
+          letter-spacing: -0.035em;
+          line-height: 1.08;
           text-align: center;
+          /* Absolutely stack inside the stage */
           position: absolute;
-          width: 100%;
-          /* default hidden */
+          inset: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          /* default: hidden */
           opacity: 0;
-          transform: translateY(12px);
+          transform: translateY(10px);
           filter: blur(6px);
           will-change: opacity, transform, filter;
         }
 
-        /* entering → fade in, move up, unblur */
         .tagline-entering {
           animation: tagline-in ${FADE_MS}ms ease-in-out forwards;
         }
-        /* visible → fully shown, no animation (stays at final state of entering) */
         .tagline-visible {
           opacity: 1;
           transform: translateY(0);
           filter: blur(0px);
         }
-        /* leaving → fade out, move up, blur */
         .tagline-leaving {
           animation: tagline-out ${FADE_MS}ms ease-in-out forwards;
         }
 
         @keyframes tagline-in {
-          from { opacity: 0; transform: translateY(12px); filter: blur(6px); }
+          from { opacity: 0; transform: translateY(10px); filter: blur(6px); }
           to   { opacity: 1; transform: translateY(0);    filter: blur(0px); }
         }
         @keyframes tagline-out {
           from { opacity: 1; transform: translateY(0);     filter: blur(0px); }
-          to   { opacity: 0; transform: translateY(-12px); filter: blur(6px); }
+          to   { opacity: 0; transform: translateY(-10px); filter: blur(6px); }
         }
 
         /* ── Tagline dots ─────────────────────────────────────── */
         .tagline-dot {
-          width: 5px; height: 5px; border-radius: 50%;
-          transition: background 0.4s ease, transform 0.4s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.4s ease;
+          width: 4px; height: 4px; border-radius: 50%;
+          transition: background 0.4s ease,
+                      transform  0.4s cubic-bezier(0.34,1.56,0.64,1),
+                      box-shadow 0.4s ease;
         }
 
         /* ══════════════════════════════════════════════════════════
-           GET STARTED BUTTON
+           GET STARTED BUTTON  — minimal ghost style
         ══════════════════════════════════════════════════════════ */
         .get-started-btn {
-          position: relative;
-          display: inline-flex; align-items: center; justify-content: center;
-          padding: 0;
+          display: inline-flex; align-items: center; gap: 0.5rem;
+          padding: 0.75rem 2rem;
+          border-radius: 9999px;
+          border: 1px solid rgba(201,169,110,0.35);
           background: transparent;
-          border: none; cursor: pointer;
-          outline: none;
-        }
-
-        /* Outer glow ring — pulses */
-        .btn-ring {
-          position: absolute; inset: -6px;
-          border-radius: 9999px;
-          border: 1px solid rgba(201,169,110,0.25);
-          animation: btn-ring-pulse 3s ease-in-out infinite;
-          pointer-events: none;
-        }
-        @keyframes btn-ring-pulse {
-          0%,100% { opacity: 0.4; transform: scale(1);    box-shadow: 0 0 0 0 rgba(201,169,110,0); }
-          50%      { opacity: 1;   transform: scale(1.04); box-shadow: 0 0 20px 4px rgba(201,169,110,0.15); }
-        }
-
-        /* Shimmer sweep */
-        .btn-shimmer {
-          position: absolute; inset: 0; border-radius: 9999px; overflow: hidden;
-          opacity: 0;
-          transition: opacity 0.4s ease;
-          pointer-events: none;
-        }
-        .btn-shimmer::after {
-          content: '';
-          position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
-          transform: skewX(-15deg);
-          animation: btn-sweep 2.8s ease-in-out infinite;
-        }
-        @keyframes btn-sweep {
-          0%   { left: -60%; opacity: 0; }
-          20%  { opacity: 1; }
-          80%  { opacity: 1; }
-          100% { left: 140%; opacity: 0; }
-        }
-        .get-started-btn:hover .btn-shimmer { opacity: 1; }
-
-        /* Label pill */
-        .btn-label {
-          position: relative; z-index: 1;
-          display: inline-flex; align-items: center; gap: 0.65rem;
-          padding: 1rem 2.8rem;
-          border-radius: 9999px;
-          font-size: 0.7rem;
-          font-weight: 700;
-          letter-spacing: 0.2em;
+          color: rgba(201,169,110,0.9);
+          font-size: 0.68rem;
+          font-weight: 600;
+          letter-spacing: 0.18em;
           text-transform: uppercase;
-          color: #04040A;
-          background: linear-gradient(135deg, #D4A85A 0%, #E8D4A0 40%, #C9A96E 70%, #B8935A 100%);
-          box-shadow:
-            0 0 30px rgba(201,169,110,0.35),
-            0 0 60px rgba(201,169,110,0.12),
-            0 4px 20px rgba(0,0,0,0.5),
-            inset 0 1px 0 rgba(255,255,255,0.25);
-          transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1),
-                      box-shadow 0.35s ease;
+          cursor: pointer;
+          outline: none;
+          transition: border-color 0.35s ease,
+                      color        0.35s ease,
+                      box-shadow   0.35s ease,
+                      transform    0.35s cubic-bezier(0.34,1.56,0.64,1);
         }
-        .get-started-btn:hover .btn-label {
-          transform: scale(1.05);
-          box-shadow:
-            0 0 50px rgba(201,169,110,0.5),
-            0 0 90px rgba(201,169,110,0.18),
-            0 6px 28px rgba(0,0,0,0.55),
-            inset 0 1px 0 rgba(255,255,255,0.3);
+        .get-started-btn:hover {
+          border-color: rgba(201,169,110,0.7);
+          color: rgba(232,212,160,1);
+          box-shadow: 0 0 22px rgba(201,169,110,0.18);
+          transform: scale(1.03);
         }
 
-        /* Arrow nudge on hover */
         .btn-arrow {
           display: inline-block;
+          font-size: 0.8rem;
           transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
-          font-size: 0.85rem;
         }
         .get-started-btn:hover .btn-arrow { transform: translateX(4px); }
       `}</style>
