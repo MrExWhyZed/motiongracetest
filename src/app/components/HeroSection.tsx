@@ -32,6 +32,10 @@ const sublines = [
   'Luxury Visuals. Zero Limits.',
 ];
 
+/* ─── Hero headline cycles ────────────────────────────────────────────────── */
+const HEADLINE_HOLD_MS = 4000;
+const HEADLINE_FADE_MS = 800;
+
 /* Timings */
 const VISIBLE_MS  = 2800;
 const FADE_MS     = 700;
@@ -57,6 +61,9 @@ export default function HeroSection() {
   const [subPhase, setSubPhase]       = useState<'typing'|'hold'|'erasing'>('typing');
   const [taglineIndex, setTaglineIndex] = useState(0);
   const [taglineState, setTaglineState] = useState<TaglineState>('entering');
+
+  /* Hero headline cycling state */
+  const [hlPhase, setHlPhase] = useState<'motionGrace'|'fadeOut'|'tagline'|'fadeIn'>('motionGrace');
 
   /* ── Typewriter engine ───────────────────────────────────────────────── */
   useEffect(() => {
@@ -143,6 +150,22 @@ export default function HeroSection() {
     }
     return () => clearTimeout(t);
   }, [heroVisible, taglineState]);
+
+  /* ── Hero headline: Motion Grace ↔ Create Once, Build Forever ─────────── */
+  useEffect(() => {
+    if (!heroVisible) return;
+    let t: ReturnType<typeof setTimeout>;
+    if (hlPhase === 'motionGrace') {
+      t = setTimeout(() => setHlPhase('fadeOut'), HEADLINE_HOLD_MS);
+    } else if (hlPhase === 'fadeOut') {
+      t = setTimeout(() => setHlPhase('tagline'), HEADLINE_FADE_MS);
+    } else if (hlPhase === 'tagline') {
+      t = setTimeout(() => setHlPhase('fadeIn'), HEADLINE_HOLD_MS);
+    } else if (hlPhase === 'fadeIn') {
+      t = setTimeout(() => setHlPhase('motionGrace'), HEADLINE_FADE_MS);
+    }
+    return () => clearTimeout(t);
+  }, [heroVisible, hlPhase]);
 
   /* ── Scroll: parallax + content fade + golden veil ──────────────────── */
   useEffect(() => {
@@ -351,18 +374,26 @@ export default function HeroSection() {
           ref={contentRef}
           className="relative z-20 max-w-5xl mx-auto px-6 sm:px-10 pt-32 pb-24 flex flex-col items-center text-center will-change-transform">
 
-          {/* ── Static Headline: Motion Grace ────────────────── */}
+          {/* ── Cycling Headline: Motion Grace ↔ Create Once, Build Forever ── */}
           <div
             className="mb-4"
             style={{
               opacity: heroVisible ? 1 : 0,
               transform: heroVisible ? 'translateY(0)' : 'translateY(20px)',
               transition: 'opacity 1s cubic-bezier(0.16,1,0.3,1) 0.3s, transform 1s cubic-bezier(0.16,1,0.3,1) 0.3s',
+              position: 'relative',
+              height: 'clamp(3.2rem, 7.5vw, 6rem)',
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}>
+
+            {/* Motion Grace */}
             <h1
               className="hero-main-headline"
               style={{
-                fontSize: 'clamp(3rem, 9vw, 7rem)',
+                fontSize: 'clamp(2.4rem, 7vw, 5.5rem)',
                 fontWeight: 800,
                 letterSpacing: '-0.04em',
                 lineHeight: 1,
@@ -371,9 +402,39 @@ export default function HeroSection() {
                 alignItems: 'baseline',
                 justifyContent: 'center',
                 gap: '0.25em',
+                position: 'absolute',
+                opacity: (hlPhase === 'motionGrace' || hlPhase === 'fadeOut') ? 1 : 0,
+                filter: (hlPhase === 'fadeOut') ? 'blur(8px)' : 'blur(0px)',
+                transform: hlPhase === 'fadeOut' ? 'translateY(-8px) scale(0.97)' : 'translateY(0) scale(1)',
+                transition: `opacity ${HEADLINE_FADE_MS}ms cubic-bezier(0.4,0,0.2,1), filter ${HEADLINE_FADE_MS}ms ease, transform ${HEADLINE_FADE_MS}ms ease`,
+                pointerEvents: hlPhase === 'motionGrace' ? 'auto' : 'none',
               }}>
               <span style={{ color: '#fff' }}>Motion</span>
               <span className="text-gradient-gold">Grace</span>
+            </h1>
+
+            {/* Create Once, Build Forever */}
+            <h1
+              className="hero-main-headline"
+              style={{
+                fontSize: 'clamp(2.4rem, 7vw, 5.5rem)',
+                fontWeight: 800,
+                letterSpacing: '-0.04em',
+                lineHeight: 1,
+                whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'baseline',
+                justifyContent: 'center',
+                gap: '0.25em',
+                position: 'absolute',
+                opacity: (hlPhase === 'tagline' || hlPhase === 'fadeIn') ? 1 : 0,
+                filter: (hlPhase === 'fadeIn') ? 'blur(8px)' : 'blur(0px)',
+                transform: hlPhase === 'fadeIn' ? 'translateY(8px) scale(0.97)' : 'translateY(0) scale(1)',
+                transition: `opacity ${HEADLINE_FADE_MS}ms cubic-bezier(0.4,0,0.2,1), filter ${HEADLINE_FADE_MS}ms ease, transform ${HEADLINE_FADE_MS}ms ease`,
+                pointerEvents: hlPhase === 'tagline' ? 'auto' : 'none',
+              }}>
+              <span style={{ color: '#fff' }}>Create Once,</span>
+              <span className="text-gradient-gold">&nbsp;Build Forever</span>
             </h1>
           </div>
 
