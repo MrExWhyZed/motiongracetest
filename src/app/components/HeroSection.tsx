@@ -63,7 +63,7 @@ export default function HeroSection() {
   const [taglineState, setTaglineState] = useState<TaglineState>('entering');
 
   /* Hero headline cycling state */
-  const [hlPhase, setHlPhase] = useState<'motionGrace'|'fadeOut'|'tagline'|'fadeIn'>('motionGrace');
+  const [hlPhase, setHlPhase] = useState<'motionGrace'|'exitMG'|'createBuild'|'exitCB'>('motionGrace');
 
   /* ── Typewriter engine ───────────────────────────────────────────────── */
   useEffect(() => {
@@ -155,13 +155,14 @@ export default function HeroSection() {
   useEffect(() => {
     if (!heroVisible) return;
     let t: ReturnType<typeof setTimeout>;
+    // motionGrace → (hold) → exitMG → (fade out MG, fade in CB) → createBuild → (hold) → exitCB → (fade out CB, fade in MG) → motionGrace
     if (hlPhase === 'motionGrace') {
-      t = setTimeout(() => setHlPhase('fadeOut'), HEADLINE_HOLD_MS);
-    } else if (hlPhase === 'fadeOut') {
-      t = setTimeout(() => setHlPhase('tagline'), HEADLINE_FADE_MS);
-    } else if (hlPhase === 'tagline') {
-      t = setTimeout(() => setHlPhase('fadeIn'), HEADLINE_HOLD_MS);
-    } else if (hlPhase === 'fadeIn') {
+      t = setTimeout(() => setHlPhase('exitMG'), HEADLINE_HOLD_MS);
+    } else if (hlPhase === 'exitMG') {
+      t = setTimeout(() => setHlPhase('createBuild'), HEADLINE_FADE_MS);
+    } else if (hlPhase === 'createBuild') {
+      t = setTimeout(() => setHlPhase('exitCB'), HEADLINE_HOLD_MS);
+    } else if (hlPhase === 'exitCB') {
       t = setTimeout(() => setHlPhase('motionGrace'), HEADLINE_FADE_MS);
     }
     return () => clearTimeout(t);
@@ -391,48 +392,25 @@ export default function HeroSection() {
 
             {/* Motion Grace */}
             <h1
-              className="hero-main-headline"
-              style={{
-                fontSize: 'clamp(2.4rem, 7vw, 5.5rem)',
-                fontWeight: 800,
-                letterSpacing: '-0.04em',
-                lineHeight: 1,
-                whiteSpace: 'nowrap',
-                display: 'flex',
-                alignItems: 'baseline',
-                justifyContent: 'center',
-                gap: '0.25em',
-                position: 'absolute',
-                opacity: (hlPhase === 'motionGrace' || hlPhase === 'fadeOut') ? 1 : 0,
-                filter: (hlPhase === 'fadeOut') ? 'blur(8px)' : 'blur(0px)',
-                transform: hlPhase === 'fadeOut' ? 'translateY(-8px) scale(0.97)' : 'translateY(0) scale(1)',
-                transition: `opacity ${HEADLINE_FADE_MS}ms cubic-bezier(0.4,0,0.2,1), filter ${HEADLINE_FADE_MS}ms ease, transform ${HEADLINE_FADE_MS}ms ease`,
-                pointerEvents: hlPhase === 'motionGrace' ? 'auto' : 'none',
-              }}>
+              className={`hl-headline ${
+                hlPhase === 'motionGrace' ? 'hl-visible'    :
+                hlPhase === 'exitMG'      ? 'hl-fade-out'   :
+                                            'hl-hidden'
+              }`}
+              style={{ fontSize: 'clamp(2.4rem, 7vw, 5.5rem)' }}>
               <span style={{ color: '#fff' }}>Motion</span>
               <span className="text-gradient-gold">Grace</span>
             </h1>
 
-            {/* Create Once, Build Forever */}
+            {/* Create Once, Build Forever — smaller to fit comfortably */}
             <h1
-              className="hero-main-headline"
-              style={{
-                fontSize: 'clamp(2.4rem, 7vw, 5.5rem)',
-                fontWeight: 800,
-                letterSpacing: '-0.04em',
-                lineHeight: 1,
-                whiteSpace: 'nowrap',
-                display: 'flex',
-                alignItems: 'baseline',
-                justifyContent: 'center',
-                gap: '0.25em',
-                position: 'absolute',
-                opacity: (hlPhase === 'tagline' || hlPhase === 'fadeIn') ? 1 : 0,
-                filter: (hlPhase === 'fadeIn') ? 'blur(8px)' : 'blur(0px)',
-                transform: hlPhase === 'fadeIn' ? 'translateY(8px) scale(0.97)' : 'translateY(0) scale(1)',
-                transition: `opacity ${HEADLINE_FADE_MS}ms cubic-bezier(0.4,0,0.2,1), filter ${HEADLINE_FADE_MS}ms ease, transform ${HEADLINE_FADE_MS}ms ease`,
-                pointerEvents: hlPhase === 'tagline' ? 'auto' : 'none',
-              }}>
+              className={`hl-headline ${
+                hlPhase === 'exitMG'      ? 'hl-fade-in'    :
+                hlPhase === 'createBuild' ? 'hl-visible'    :
+                hlPhase === 'exitCB'      ? 'hl-fade-out'   :
+                                            'hl-hidden'
+              }`}
+              style={{ fontSize: 'clamp(1.55rem, 4.4vw, 3.5rem)', letterSpacing: '-0.025em' }}>
               <span style={{ color: '#fff' }}>Create Once,</span>
               <span className="text-gradient-gold">&nbsp;Build Forever</span>
             </h1>
@@ -600,6 +578,33 @@ export default function HeroSection() {
         .hero-widget-right { right: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
         @media (min-width:1280px) { .hero-widget-right { right: 3rem; } }
         @media (max-width:1023px) { .hero-widget-left, .hero-widget-right { display: none !important; } }
+
+        /* ── Headline crossfade keyframes ────────────────────────── */
+        .hl-headline {
+          font-weight: 800;
+          letter-spacing: -0.04em;
+          line-height: 1;
+          white-space: nowrap;
+          display: flex;
+          align-items: baseline;
+          justify-content: center;
+          gap: 0.25em;
+          position: absolute;
+          margin: 0;
+          will-change: opacity, filter, transform;
+        }
+        @keyframes hl-fade-out {
+          0%   { opacity: 1; filter: blur(0px);  transform: translateY(0)    scale(1);    }
+          100% { opacity: 0; filter: blur(10px); transform: translateY(-12px) scale(0.95); }
+        }
+        @keyframes hl-fade-in {
+          0%   { opacity: 0; filter: blur(10px); transform: translateY(12px)  scale(0.95); }
+          100% { opacity: 1; filter: blur(0px);  transform: translateY(0)    scale(1);    }
+        }
+        .hl-fade-out { animation: hl-fade-out 700ms cubic-bezier(0.22,1,0.36,1) forwards; }
+        .hl-fade-in  { animation: hl-fade-in  700ms cubic-bezier(0.22,1,0.36,1) forwards; }
+        .hl-visible  { opacity: 1; filter: blur(0px); transform: translateY(0) scale(1); }
+        .hl-hidden   { opacity: 0; pointer-events: none; }
 
         /* ── Particles ───────────────────────────────────────────── */
         @keyframes hero-float-particle {
