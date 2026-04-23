@@ -24,17 +24,17 @@ const particles = Array.from({ length: 18 }, (_, i) => ({
       : 'none',
 }));
 
-/* ─── Cycling taglines ───────────────────────────────────────────────────── */
-const taglines = [
-  { white: 'Cinematic CGI.', gold: 'Infinite Possibilities.' },
-  { white: 'Your Product.', gold: 'Elevated Forever.' },
-  { white: 'Beyond Reality.', gold: 'Endlessly Reimagined.' },
-  { white: 'Luxury Visuals.', gold: 'Zero Limits.' },
+/* ─── Cycling subheadlines (typing effect) ───────────────────────────────── */
+const sublines = [
+  'Cinematic CGI. Infinite Possibilities.',
+  'Your Product. Elevated Forever.',
+  'Beyond Reality. Endlessly Reimagined.',
+  'Luxury Visuals. Zero Limits.',
 ];
 
 /* Timings */
-const VISIBLE_MS  = 2800; // how long tagline stays fully visible
-const FADE_MS     = 700;  // fade-in / fade-out duration (must match CSS)
+const VISIBLE_MS  = 2800;
+const FADE_MS     = 700;
 
 type TaglineState = 'entering' | 'visible' | 'leaving';
 
@@ -51,7 +51,10 @@ export default function HeroSection() {
   const [typeText,     setTypeText]     = useState('');
   const [heroVisible,  setHeroVisible]  = useState(false);
 
-  /* Cycling headline state */
+  /* Subheading typing state */
+  const [subIndex, setSubIndex]       = useState(0);
+  const [subTyped, setSubTyped]       = useState('');
+  const [subPhase, setSubPhase]       = useState<'typing'|'hold'|'erasing'>('typing');
   const [taglineIndex, setTaglineIndex] = useState(0);
   const [taglineState, setTaglineState] = useState<TaglineState>('entering');
 
@@ -97,26 +100,47 @@ export default function HeroSection() {
     return () => clearTimeout(timeout);
   }, []);
 
-  /* ── Tagline cycling ─────────────────────────────────────────────────── */
+  /* ── Subheading typing engine ────────────────────────────────────────── */
   useEffect(() => {
     if (!heroVisible) return;
-
     let t: ReturnType<typeof setTimeout>;
+    const full = sublines[subIndex];
 
+    if (subPhase === 'typing') {
+      if (subTyped.length < full.length) {
+        t = setTimeout(() => setSubTyped(full.slice(0, subTyped.length + 1)), 38);
+      } else {
+        t = setTimeout(() => setSubPhase('hold'), VISIBLE_MS);
+      }
+    } else if (subPhase === 'hold') {
+      t = setTimeout(() => setSubPhase('erasing'), 400);
+    } else if (subPhase === 'erasing') {
+      if (subTyped.length > 0) {
+        t = setTimeout(() => setSubTyped(subTyped.slice(0, -1)), 22);
+      } else {
+        const next = (subIndex + 1) % sublines.length;
+        setSubIndex(next);
+        setTaglineIndex(next);
+        setSubPhase('typing');
+      }
+    }
+    return () => clearTimeout(t);
+  }, [heroVisible, subPhase, subTyped, subIndex]);
+
+  /* ── Tagline cycling (kept for dots indicator) ───────────────────────── */
+  useEffect(() => {
+    if (!heroVisible) return;
+    let t: ReturnType<typeof setTimeout>;
     if (taglineState === 'entering') {
-      // After fade-in completes, hold visible
       t = setTimeout(() => setTaglineState('visible'), FADE_MS);
     } else if (taglineState === 'visible') {
-      // Hold, then start fade-out
       t = setTimeout(() => setTaglineState('leaving'), VISIBLE_MS);
     } else if (taglineState === 'leaving') {
-      // After fade-out, advance to next tagline and reset
       t = setTimeout(() => {
-        setTaglineIndex((prev) => (prev + 1) % taglines.length);
+        setTaglineIndex((prev) => (prev + 1) % sublines.length);
         setTaglineState('entering');
       }, FADE_MS);
     }
-
     return () => clearTimeout(t);
   }, [heroVisible, taglineState]);
 
@@ -164,8 +188,6 @@ export default function HeroSection() {
       : taglineState === 'visible'
       ? 'tagline-visible'
       : 'tagline-leaving';
-
-  const current = taglines[taglineIndex];
 
   return (
     <>
@@ -329,12 +351,47 @@ export default function HeroSection() {
           ref={contentRef}
           className="relative z-20 max-w-5xl mx-auto px-6 sm:px-10 pt-32 pb-24 flex flex-col items-center text-center will-change-transform">
 
-          {/* ── Cycling Headline ──────────────────────────────── */}
-          <div className="headline-stage mb-8">
-            <h1 key={taglineIndex} className={`headline-tagline ${tClass}`}>
-              <span className="block text-foreground">{current.white}</span>
-              <span className="block text-gradient-gold">{current.gold}</span>
+          {/* ── Static Headline: Motion Grace ────────────────── */}
+          <div
+            className="mb-4"
+            style={{
+              opacity: heroVisible ? 1 : 0,
+              transform: heroVisible ? 'translateY(0)' : 'translateY(20px)',
+              transition: 'opacity 1s cubic-bezier(0.16,1,0.3,1) 0.3s, transform 1s cubic-bezier(0.16,1,0.3,1) 0.3s',
+            }}>
+            <h1
+              className="hero-main-headline"
+              style={{
+                fontSize: 'clamp(3rem, 9vw, 7rem)',
+                fontWeight: 800,
+                letterSpacing: '-0.04em',
+                lineHeight: 1,
+                whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'baseline',
+                justifyContent: 'center',
+                gap: '0.25em',
+              }}>
+              <span style={{ color: '#fff' }}>Motion</span>
+              <span className="text-gradient-gold">Grace</span>
             </h1>
+          </div>
+
+          {/* ── Typing Subheading ─────────────────────────────── */}
+          <div
+            className="mb-8"
+            style={{
+              opacity: heroVisible ? 1 : 0,
+              transition: 'opacity 0.8s ease 0.8s',
+              minHeight: '1.6em',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <p className="typing-subheading">
+              {subTyped}
+              <span className="typing-cursor">|</span>
+            </p>
           </div>
 
           {/* ── Tagline dots indicator ────────────────────────── */}
@@ -344,14 +401,14 @@ export default function HeroSection() {
               opacity: heroVisible ? 1 : 0,
               transition: 'opacity 0.8s ease 1.4s',
             }}>
-            {taglines.map((_, i) => (
+            {sublines.map((_, i) => (
               <div
                 key={i}
                 className="tagline-dot"
                 style={{
-                  background: i === taglineIndex ? 'var(--primary)' : 'rgba(201,169,110,0.2)',
-                  boxShadow: i === taglineIndex ? '0 0 8px rgba(201,169,110,0.6)' : 'none',
-                  transform: i === taglineIndex ? 'scale(1.4)' : 'scale(1)',
+                  background: i === subIndex ? 'var(--primary)' : 'rgba(201,169,110,0.2)',
+                  boxShadow: i === subIndex ? '0 0 8px rgba(201,169,110,0.6)' : 'none',
+                  transform: i === subIndex ? 'scale(1.4)' : 'scale(1)',
                 }}
               />
             ))}
@@ -363,6 +420,10 @@ export default function HeroSection() {
               opacity: heroVisible ? 1 : 0,
               transform: heroVisible ? 'translateY(0)' : 'translateY(16px)',
               transition: 'opacity 0.9s cubic-bezier(0.16,1,0.3,1) 1.1s, transform 0.9s cubic-bezier(0.16,1,0.3,1) 1.1s',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '1.75rem',
             }}>
             <button
               onClick={() => document.querySelector('#cta')?.scrollIntoView({ behavior: 'smooth' })}
@@ -370,14 +431,14 @@ export default function HeroSection() {
               Get Started
               <span className="btn-arrow">→</span>
             </button>
-          </div>
 
-          {/* ── Scroll indicator ─────────────────────────────── */}
-          <div
-            className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
-            style={{ opacity: heroVisible ? 0.4 : 0, transition: 'opacity 1s ease 1.6s' }}>
-            <span className="text-[9px] tracking-[0.25em] uppercase text-muted-foreground">Scroll</span>
-            <div className="w-px h-10 bg-gradient-to-b from-primary/60 to-transparent animate-scroll-bounce" />
+            {/* ── Scroll indicator ─────────────────────────── */}
+            <div
+              className="flex flex-col items-center gap-2"
+              style={{ opacity: heroVisible ? 0.4 : 0, transition: 'opacity 1s ease 1.6s' }}>
+              <span className="text-[9px] tracking-[0.25em] uppercase text-muted-foreground">Scroll</span>
+              <div className="w-px h-10 bg-gradient-to-b from-primary/60 to-transparent animate-scroll-bounce" />
+            </div>
           </div>
         </div>
       </section>
@@ -555,8 +616,26 @@ export default function HeroSection() {
                       box-shadow 0.4s ease;
         }
 
-        /* ══════════════════════════════════════════════════════════
-           GET STARTED BUTTON  — minimal ghost style
+        /* ── Typing Subheading ───────────────────────────────── */
+        .typing-subheading {
+          font-size: clamp(0.8rem, 1.8vw, 1.1rem);
+          font-weight: 400;
+          letter-spacing: 0.06em;
+          color: rgba(237,233,227,0.6);
+          font-family: var(--font-sans);
+          margin: 0;
+          display: inline-flex;
+          align-items: center;
+        }
+        .typing-cursor {
+          color: rgba(201,169,110,0.9);
+          animation: preloader-blink 0.8s step-end infinite;
+          text-shadow: 0 0 10px rgba(201,169,110,0.7);
+          margin-left: 1px;
+          font-weight: 100;
+        }
+
+        /* ── GET STARTED BUTTON  — minimal ghost style
         ══════════════════════════════════════════════════════════ */
         .get-started-btn {
           display: inline-flex; align-items: center; gap: 0.5rem;
