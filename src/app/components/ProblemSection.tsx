@@ -105,6 +105,7 @@ export default function ProblemSection() {
   const mouseRef     = useRef({ x: 0.5, y: 0.5 });
   const rafRef       = useRef<number>(0);
   const glowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const s2RevealRef  = useRef<HTMLDivElement>(null);
 
   /* Screen 1 */
   const [visibleLines, setVisibleLines] = useState<boolean[]>(new Array(problemWords.length).fill(false));
@@ -188,6 +189,20 @@ export default function ProblemSection() {
     rafRef.current = requestAnimationFrame(animate);
     return () => { cancelAnimationFrame(rafRef.current); ro.disconnect(); };
   }, []);
+
+  /* Screen 2 — word reveal driven by wordProgress (sticky-safe) */
+  useEffect(() => {
+    const block = s2RevealRef.current;
+    if (!block) return;
+    const wordEls = block.querySelectorAll<HTMLSpanElement>('.s2-reveal-word');
+    // Spread reveal across first 55% of wordProgress so all words light up
+    // well before the arrow/transition phase kicks in.
+    const revealProgress = Math.max(0, Math.min(1, wordProgress / 0.55));
+    const activeCount = Math.floor(revealProgress * wordEls.length);
+    wordEls.forEach((w, i) =>
+      i < activeCount ? w.classList.add('s2-active') : w.classList.remove('s2-active')
+    );
+  }, [wordProgress]);
 
   /* Unified scroll handler */
   const handleScroll = useCallback(() => {
@@ -343,47 +358,37 @@ export default function ProblemSection() {
             animation: glowPulse ? 'subtle-bloom 5s ease-in-out infinite' : 'none',
           }} />
 
-          <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ gap: 0 }}>
-            <div style={{ marginBottom: '2.5rem', opacity: wordProgress > 0.1 ? wordProgress * 0.6 : 0, transition: 'none', display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '32px', height: '1px', background: 'rgba(201,169,110,0.35)' }} />
-              <span style={{ fontSize: '9px', letterSpacing: '0.35em', textTransform: 'uppercase', color: 'rgba(201,169,110,0.45)', fontWeight: 400 }}>The Alternative</span>
-              <div style={{ width: '32px', height: '1px', background: 'rgba(201,169,110,0.35)' }} />
+          <div className="absolute inset-0 flex flex-col items-center justify-center px-6" style={{ gap: 0 }}>
+
+            {/* Eyebrow */}
+            <div style={{ marginBottom: '2.5rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '20px', height: '1px', background: 'rgba(201,169,110,0.5)' }} />
+              <span style={{ fontSize: '10px', letterSpacing: '0.25em', textTransform: 'uppercase', color: 'rgba(201,169,110,0.7)', fontWeight: 700 }}>The Alternative</span>
+              <div style={{ width: '20px', height: '1px', background: 'rgba(201,169,110,0.5)' }} />
             </div>
 
-            {revealLines.map((line, li) => {
-              const lineStart = li / revealLines.length, lineEnd = lineStart + 1 / revealLines.length;
-              const lineP = Math.max(0, Math.min(1, (wordProgress - lineStart) / (lineEnd - lineStart)));
-              const isBrand = line.type === 'brand', isHighlight = line.type === 'highlight', isPlain = line.type === 'plain';
-              return (
-                <div key={li} style={{ display: 'flex', alignItems: 'baseline', gap: isBrand ? '0.28em' : '0.22em', marginBottom: li < revealLines.length - 1 ? '0.05em' : 0, lineHeight: 1 }}>
-                  {line.words.map((word, wi) => {
-                    const wordStart = (wi / line.words.length) * 0.55, wordEnd = wordStart + 0.6;
-                    const wp2 = easeOutExpo(Math.max(0, Math.min(1, (lineP - wordStart) / (wordEnd - wordStart))));
-                    const isBrandWord = isBrand && word === 'MotionGrace.';
-                    return (
-                      <span key={wi} style={{
-                        display: 'inline-block',
-                        fontSize: isBrand || isHighlight ? 'clamp(3.2rem, 8.5vw, 8.5rem)' : 'clamp(2rem, 5.2vw, 5rem)',
-                        fontWeight: isBrand ? 800 : isHighlight ? 700 : 300,
-                        letterSpacing: isBrand ? '-0.035em' : isHighlight ? '-0.03em' : '-0.015em',
-                        lineHeight: 1.05, opacity: wp2,
-                        transform: `translateY(${(1 - wp2) * 60}%) skewY(${(1 - wp2) * -4}deg)`,
-                        filter: `blur(${(1 - wp2) * 12}px)`, transition: 'none',
-                        color: isBrandWord ? 'transparent' : isHighlight ? `rgba(237,233,227,${0.55 + wp2 * 0.45})` : `rgba(237,233,227,${0.22 + wp2 * 0.38})`,
-                        background: isBrandWord ? 'linear-gradient(118deg, #9A7040 0%, #C9A96E 22%, #F0D898 48%, #D4AA6A 72%, #B8935A 100%)' : 'none',
-                        WebkitBackgroundClip: isBrandWord ? 'text' : 'unset', backgroundClip: isBrandWord ? 'text' : 'unset',
-                        marginRight: isPlain && wi < line.words.length - 1 ? '0.05em' : 0,
-                      }}>{word}</span>
-                    );
-                  })}
-                </div>
-              );
-            })}
-
-            <div style={{ marginTop: '3rem', width: '100%', maxWidth: '520px', height: '1px', overflow: 'hidden', opacity: wordProgress > 0.88 ? Math.min(1, (wordProgress - 0.88) * 8) : 0, transition: 'none' }}>
-              <div style={{ height: '1px', width: `${Math.min(100, Math.max(0, (wordProgress - 0.88) / 0.12 * 100))}%`, background: 'linear-gradient(90deg, transparent 0%, rgba(201,169,110,0.2) 20%, rgba(201,169,110,0.45) 50%, rgba(201,169,110,0.2) 80%, transparent 100%)', transition: 'none' }} />
+            {/* Scroll-driven headline */}
+            <div ref={s2RevealRef} style={{ textAlign: 'center', maxWidth: '820px' }}>
+              <h2 style={{ fontSize: 'clamp(2rem, 5.5vw, 4.2rem)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.05, margin: 0 }}>
+                {/* "There is a" — plain small */}
+                {['There', 'is', 'a'].map((word, i) => (
+                  <span key={`plain-${i}`} className="s2-reveal-word" style={{ marginRight: '0.25em' }}>{word} </span>
+                ))}
+                {/* "Better Way." — highlight large */}
+                {['Better', 'Way.'].map((word, i) => (
+                  <span key={`hl-${i}`} className="s2-reveal-word s2-highlight" style={{ marginRight: '0.22em' }}>{word} </span>
+                ))}
+                {/* line break */}
+                <br />
+                {/* "Try" — plain */}
+                <span className="s2-reveal-word" style={{ marginRight: '0.28em' }}>Try </span>
+                {/* "MotionGrace." — brand gradient */}
+                <span className="s2-reveal-word s2-brand">MotionGrace.</span>
+              </h2>
             </div>
-            <div style={{ marginTop: '1.5rem', opacity: wordProgress > 0.94 ? (wordProgress - 0.94) * 16 : 0, transform: `translateY(${wordProgress > 0.94 ? 0 : 8}px)`, transition: 'none' }}>
+
+            {/* Sub-label */}
+            <div style={{ marginTop: '2.5rem' }}>
               <span style={{ fontSize: '11px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(201,169,110,0.38)', fontWeight: 400 }}>AI-powered product visuals</span>
             </div>
           </div>
@@ -512,6 +517,40 @@ export default function ProblemSection() {
       </section>
 
       <style>{`
+        /* ── Screen 2 scroll-reveal words ── */
+        .s2-reveal-word {
+          display: inline;
+          color: rgba(237,233,227,0.12);
+          transition: color 0.55s cubic-bezier(0.16,1,0.3,1);
+        }
+        .s2-reveal-word.s2-active {
+          color: rgba(237,233,227,0.9);
+        }
+        .s2-reveal-word.s2-highlight {
+          font-size: clamp(2.6rem, 7vw, 6rem);
+          font-weight: 700;
+          letter-spacing: -0.03em;
+          color: rgba(237,233,227,0.12);
+          transition: color 0.55s cubic-bezier(0.16,1,0.3,1);
+        }
+        .s2-reveal-word.s2-highlight.s2-active {
+          color: rgba(237,233,227,1);
+        }
+        .s2-reveal-word.s2-brand {
+          font-size: clamp(2.6rem, 7vw, 6rem);
+          font-weight: 800;
+          letter-spacing: -0.035em;
+          -webkit-text-fill-color: transparent;
+          background: linear-gradient(135deg, #B8935A 0%, #E8D4A0 45%, #C9A96E 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          opacity: 0.15;
+          transition: opacity 0.55s cubic-bezier(0.16,1,0.3,1);
+        }
+        .s2-reveal-word.s2-brand.s2-active {
+          opacity: 1;
+          -webkit-text-fill-color: transparent;
+        }
         @keyframes noise-shift {
           0%   { background-position: 0 0 }
           33%  { background-position: -8px 12px }
