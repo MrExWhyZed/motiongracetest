@@ -3,7 +3,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import HeroSection from '@/app/components/HeroSection';
 import HeroBridge from '@/app/components/HeroBridge';
-import ProblemSection from '@/app/components/ProblemSection';
+{/*import ProblemSection from '@/app/components/ProblemSection';*/}
 import ServicesSection from '@/app/components/ServicesSection';
 import ProcessSection from '@/app/components/ProcessSection';
 import TransformationSection from '@/app/components/TransformationSection';
@@ -24,8 +24,8 @@ export default function HomePage() {
       {/* Bridge: hero bleeds into next section with descending particles */}
       <HeroBridge />
 
-      {/* 2. Problem — glitch / uneasy / frustration */}
-      <ProblemSection />
+      {/* 2. Problem — glitch / uneasy / frustration 
+      <ProblemSection />*/}
 
       {/* 3. Services — the solution revealed */}
       <ServicesSection />
