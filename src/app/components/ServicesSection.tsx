@@ -245,7 +245,7 @@ function ServiceCard({ service, index, isActive, onHover }: {
   const entryTransform = () => {
     if (entryState === 'hidden') return `translateY(70px) scale(0.91)`;
     if (entryState === 'entering') return `translateY(0px) scale(1)`;
-    return `translateY(${magnetPull.y}px) translateX(${magnetPull.x}px)`;
+    return `translateY(0px)`;
   };
 
   const entryOpacity = entryState === 'hidden' ? 0 : 1;
@@ -265,6 +265,8 @@ function ServiceCard({ service, index, isActive, onHover }: {
              filter 0.9s ease ${index * 180}ms`
           : `transform 0.22s cubic-bezier(0.16,1,0.3,1),
              opacity 0.3s ease`,
+        animation: entryState === 'visible' ? `card-float ${7 + index * 1.3}s ease-in-out infinite` : 'none',
+        animationDelay: `${index * 0.9}s`,
       }}
       onMouseEnter={() => onHover(service.id)}
       onMouseLeave={handleMouseLeave}
@@ -489,7 +491,7 @@ export default function ServicesSection() {
   }, []);
 
   return (
-    <section id="services" className="relative py-28 sm:py-40 px-6 sm:px-10 overflow-hidden" style={{
+    <section id="services" className="relative py-16 sm:py-24 px-6 sm:px-10 overflow-hidden" style={{
       background: 'linear-gradient(to bottom, #06060E 0%, #080812 30%, #07071040 60%, var(--background) 100%)',
     }}>
 
@@ -503,7 +505,7 @@ export default function ServicesSection() {
 
       <div className="relative z-10 max-w-7xl mx-auto">
         {/* ── Header ── */}
-        <div ref={headingRef} className="mb-20">
+        <div ref={headingRef} className="mb-12">
           <div className="inline-flex items-center gap-2.5 mb-6" style={{
             opacity: headingVisible ? 1 : 0,
             transform: headingVisible ? 'translateY(0)' : 'translateY(24px)',
@@ -621,6 +623,12 @@ export default function ServicesSection() {
       </div>
 
       <style>{`
+        @keyframes card-float {
+          0%, 100% { transform: translateY(0px); }
+          30% { transform: translateY(-10px); }
+          60% { transform: translateY(-5px); }
+          80% { transform: translateY(-14px); }
+        }
         @keyframes orbit-spin {
           from { transform: translate(-50%, -50%) rotate(0deg); }
           to   { transform: translate(-50%, -50%) rotate(360deg); }
