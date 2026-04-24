@@ -48,12 +48,13 @@ export default function HeroSection() {
   const contentRef = useRef<HTMLDivElement>(null);
   const veilRef    = useRef<HTMLDivElement>(null);
 
-  /* Preloader state */
+  /* Preloader state — skip on refresh/revisit */
+  const hasSeenPreloader = typeof window !== 'undefined' && sessionStorage.getItem('mg_preloader_done') === '1';
   const [preloaderPhase, setPreloaderPhase] = useState<
     'wait' | 'loading' | 'fadeout' | 'done'
-  >('wait');
+  >(hasSeenPreloader ? 'done' : 'wait');
   const [typeText,     setTypeText]     = useState('');
-  const [heroVisible,  setHeroVisible]  = useState(false);
+  const [heroVisible,  setHeroVisible]  = useState(hasSeenPreloader);
 
   /* Subheading typing state */
   const [subIndex, setSubIndex]       = useState(0);
@@ -67,6 +68,9 @@ export default function HeroSection() {
 
   /* ── Typewriter engine ───────────────────────────────────────────────── */
   useEffect(() => {
+    // Skip preloader if already seen this session
+    if (sessionStorage.getItem('mg_preloader_done') === '1') return;
+
     const waitStr = 'Please Wait.....';
     const loadStr = 'MotionGrace Is Loading..';
     let timeout: ReturnType<typeof setTimeout>;
@@ -94,6 +98,7 @@ export default function HeroSection() {
                 timeout = setTimeout(() => {
                   setPreloaderPhase('done');
                   setHeroVisible(true);
+                  sessionStorage.setItem('mg_preloader_done', '1');
                 }, 900);
               }, 800);
             }
