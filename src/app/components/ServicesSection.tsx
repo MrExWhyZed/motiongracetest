@@ -166,6 +166,42 @@ function BackgroundMesh() {
   );
 }
 
+/* ─── Reveal helper: wraps a child with scroll-triggered fade+slide ─── */
+function Reveal({
+  children,
+  delay = 0,
+  revealed,
+  from = 'bottom',
+  distance = 28,
+  duration = 900,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  revealed: boolean;
+  from?: 'bottom' | 'left' | 'right' | 'scale';
+  distance?: number;
+  duration?: number;
+}) {
+  const hiddenTransform =
+    from === 'bottom' ? `translateY(${distance}px)`
+    : from === 'left' ? `translateX(-${distance}px)`
+    : from === 'right' ? `translateX(${distance}px)`
+    : `scale(0.88) translateY(${distance * 0.5}px)`;
+
+  return (
+    <div style={{
+      opacity: revealed ? 1 : 0,
+      transform: revealed ? 'translateY(0) translateX(0) scale(1)' : hiddenTransform,
+      filter: revealed ? 'blur(0px)' : 'blur(4px)',
+      transition: `opacity ${duration}ms cubic-bezier(0.16,1,0.3,1) ${delay}ms,
+                   transform ${duration}ms cubic-bezier(0.16,1,0.3,1) ${delay}ms,
+                   filter ${duration * 0.8}ms ease ${delay}ms`,
+    }}>
+      {children}
+    </div>
+  );
+}
+
 /* ─── Enhanced Magnetic Card ─── */
 function ServiceCard({ service, index, isActive, onHover }: {
   service: typeof services[0];
@@ -177,53 +213,50 @@ function ServiceCard({ service, index, isActive, onHover }: {
   const cardRef = useRef<HTMLDivElement>(null);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [glowXY, setGlowXY] = useState({ x: 50, y: 50 });
-  const [magnetPull, setMagnetPull] = useState({ x: 0, y: 0 });
   const [entryState, setEntryState] = useState<'hidden' | 'entering' | 'visible'>('hidden');
+  // Per-element reveal stages — each fires with its own delay after card enters
+  const [revealStage, setRevealStage] = useState(0);
   const animFrame = useRef<number>(0);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && entryState === 'hidden') {
-          setTimeout(() => setEntryState('entering'), index * 180);
-          setTimeout(() => setEntryState('visible'), index * 180 + 900);
+          const cardDelay = index * 220;
+          setTimeout(() => setEntryState('entering'), cardDelay);
+          setTimeout(() => setEntryState('visible'), cardDelay + 1000);
+          // Stage the inner element reveals after the card shell arrives
+          const stageBase = cardDelay + 300;
+          setTimeout(() => setRevealStage(1), stageBase);          // tag + number
+          setTimeout(() => setRevealStage(2), stageBase + 160);    // icon
+          setTimeout(() => setRevealStage(3), stageBase + 340);    // title
+          setTimeout(() => setRevealStage(4), stageBase + 520);    // description
+          setTimeout(() => setRevealStage(5), stageBase + 720);    // stats
+          setTimeout(() => setRevealStage(6), stageBase + 920);    // detail + arrow + bar
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.08 }
     );
     if (wrapRef.current) observer.observe(wrapRef.current);
     return () => observer.disconnect();
   }, [index, entryState]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current || !wrapRef.current) return;
+    if (!cardRef.current) return;
     const rect = cardRef.current.getBoundingClientRect();
-    const wRect = wrapRef.current.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
     const dx = e.clientX - cx;
     const dy = e.clientY - cy;
-
-    // Tilt
     setTilt({ x: (dy / rect.height) * 10, y: (dx / rect.width) * -10 });
-
-    // Cursor-follow glow
     setGlowXY({
       x: ((e.clientX - rect.left) / rect.width) * 100,
       y: ((e.clientY - rect.top) / rect.height) * 100,
     });
-
-    // Magnetic pull on wrapper
-    const wCx = wRect.left + wRect.width / 2;
-    const wCy = wRect.top + wRect.height / 2;
-    const wDx = e.clientX - wCx;
-    const wDy = e.clientY - wCy;
-    setMagnetPull({ x: wDx * 0.06, y: wDy * 0.06 });
   }, []);
 
   const handleMouseLeave = useCallback(() => {
     onHover(null);
-    // Spring back
     cancelAnimationFrame(animFrame.current);
     const spring = () => {
       setTilt(prev => {
@@ -233,38 +266,28 @@ function ServiceCard({ service, index, isActive, onHover }: {
         animFrame.current = requestAnimationFrame(spring);
         return { x: nx, y: ny };
       });
-      setMagnetPull(prev => {
-        const nx = prev.x * 0.75;
-        const ny = prev.y * 0.75;
-        return { x: nx, y: ny };
-      });
     };
     animFrame.current = requestAnimationFrame(spring);
   }, [onHover]);
 
   const entryTransform = () => {
-    if (entryState === 'hidden') return `translateY(70px) scale(0.91)`;
-    if (entryState === 'entering') return `translateY(0px) scale(1)`;
-    return `translateY(0px)`;
+    if (entryState === 'hidden') return `translateY(80px) scale(0.90)`;
+    return `translateY(0px) scale(1)`;
   };
 
-  const entryOpacity = entryState === 'hidden' ? 0 : 1;
-  const entryFilter = entryState === 'hidden' ? 'blur(8px)' : 'blur(0px)';
+  const r = (stage: number) => revealStage >= stage;
 
   return (
     <div
       ref={wrapRef}
       className="relative"
       style={{
-        opacity: entryOpacity,
-        filter: entryFilter,
+        opacity: entryState === 'hidden' ? 0 : 1,
+        filter: entryState === 'hidden' ? 'blur(12px)' : 'blur(0px)',
         transform: entryTransform(),
-        transition: entryState !== 'visible'
-          ? `opacity 1s cubic-bezier(0.16,1,0.3,1) ${index * 180}ms,
-             transform 1.1s cubic-bezier(0.16,1,0.3,1) ${index * 180}ms,
-             filter 0.9s ease ${index * 180}ms`
-          : `transform 0.22s cubic-bezier(0.16,1,0.3,1),
-             opacity 0.3s ease`,
+        transition: `opacity 1.1s cubic-bezier(0.16,1,0.3,1) ${index * 220}ms,
+                     transform 1.3s cubic-bezier(0.16,1,0.3,1) ${index * 220}ms,
+                     filter 1s ease ${index * 220}ms`,
         animation: entryState === 'visible' ? `card-float ${7 + index * 1.3}s ease-in-out infinite` : 'none',
         animationDelay: `${index * 0.9}s`,
       }}
@@ -276,15 +299,12 @@ function ServiceCard({ service, index, isActive, onHover }: {
         ref={cardRef}
         className="relative overflow-hidden rounded-[32px] flex flex-col h-full cursor-default"
         style={{
-          // Glassmorphism + gradient border
           background: isActive
             ? `linear-gradient(145deg, rgba(${service.accentRgb},0.08) 0%, rgba(8,8,18,0.97) 45%, rgba(6,6,14,0.99) 100%)`
             : 'rgba(9,9,18,0.93)',
-          // Layered border: accent glow + base
           border: isActive
             ? `1px solid rgba(${service.accentRgb},0.28)`
             : '1px solid rgba(22,22,38,1)',
-          // Deep shadow + inner light reflection
           boxShadow: isActive
             ? `0 0 0 1px rgba(${service.accentRgb},0.06),
                0 0 60px rgba(${service.accentRgb},0.14),
@@ -295,14 +315,13 @@ function ServiceCard({ service, index, isActive, onHover }: {
             : `0 4px 30px rgba(0,0,0,0.5),
                inset 0 1px 0 rgba(255,255,255,0.025),
                inset 0 -1px 0 rgba(0,0,0,0.3)`,
-          // 3D tilt
           transform: `perspective(1100px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
           transition: isActive
             ? 'background 0.9s ease, border-color 0.7s ease, box-shadow 0.9s ease, transform 0.16s ease'
             : 'background 0.7s ease, border-color 0.6s ease, box-shadow 0.7s ease, transform 0.4s cubic-bezier(0.16,1,0.3,1)',
         }}
       >
-        {/* Cursor-follow glow inside card */}
+        {/* Cursor-follow glow */}
         <div className="absolute inset-0 pointer-events-none z-0 rounded-[32px] overflow-hidden">
           <div style={{
             position: 'absolute', inset: 0,
@@ -316,11 +335,11 @@ function ServiceCard({ service, index, isActive, onHover }: {
         {/* Orbit rings */}
         <OrbitRing color={service.accent} accentRgb={service.accentRgb} active={isActive} />
 
-        {/* Glass noise texture */}
+        {/* Glass noise */}
         <div className="absolute inset-0 pointer-events-none z-0 rounded-[32px] opacity-20"
           style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E")` }} />
 
-        {/* Top edge glass highlight (light reflection) */}
+        {/* Top edge highlight */}
         <div className="absolute top-0 left-0 right-0 pointer-events-none z-10" style={{
           height: '1px',
           background: isActive
@@ -329,20 +348,16 @@ function ServiceCard({ service, index, isActive, onHover }: {
           transition: 'all 0.8s ease',
         }} />
 
-        {/* Animated inner gradient — subtle motion */}
+        {/* Inner conic gradient */}
         <div className="absolute inset-0 pointer-events-none z-0 rounded-[32px] overflow-hidden">
           <div style={{
             position: 'absolute', inset: '-50%',
             width: '200%', height: '200%',
             background: `conic-gradient(from ${isActive ? '120deg' : '0deg'} at 50% 50%,
-              rgba(${service.accentRgb},0.02) 0deg,
-              transparent 60deg,
-              rgba(${service.accentRgb},0.015) 120deg,
-              transparent 180deg,
-              rgba(${service.accentRgb},0.02) 240deg,
-              transparent 300deg,
-              rgba(${service.accentRgb},0.02) 360deg
-            )`,
+              rgba(${service.accentRgb},0.02) 0deg, transparent 60deg,
+              rgba(${service.accentRgb},0.015) 120deg, transparent 180deg,
+              rgba(${service.accentRgb},0.02) 240deg, transparent 300deg,
+              rgba(${service.accentRgb},0.02) 360deg)`,
             animation: isActive ? 'inner-conic-spin 12s linear infinite' : 'none',
             transition: 'all 0.8s ease',
           }} />
@@ -358,115 +373,134 @@ function ServiceCard({ service, index, isActive, onHover }: {
           }} />
         </div>
 
-        {/* Content */}
+        {/* ── Content with per-element reveals ── */}
         <div className="relative z-10 p-8 flex flex-col h-full gap-6">
 
-          {/* Top row: tag + number */}
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold tracking-[0.22em] uppercase px-3 py-1.5 rounded-full" style={{
-              color: service.accent,
-              background: `rgba(${service.accentRgb},${isActive ? '0.13' : '0.07'})`,
-              border: `1px solid rgba(${service.accentRgb},${isActive ? '0.28' : '0.15'})`,
-              boxShadow: isActive ? `0 0 18px rgba(${service.accentRgb},0.2), inset 0 1px 0 rgba(${service.accentRgb},0.15)` : 'none',
-              transition: 'all 0.6s ease',
-            }}>
-              {service.tag}
-            </span>
-            <span className="text-5xl font-black tracking-tighter tabular-nums" style={{
-              color: isActive ? service.accent : 'rgba(107,107,128,0.12)',
-              transition: 'color 0.7s ease, text-shadow 0.7s ease',
-              lineHeight: 1,
-              textShadow: isActive ? `0 0 35px rgba(${service.accentRgb},0.45)` : 'none',
-            }}>
-              {service.number}
-            </span>
-          </div>
-
-          {/* Icon with glow */}
-          <div className="w-13 h-13 rounded-2xl flex items-center justify-center relative" style={{
-            width: '52px', height: '52px',
-            background: `rgba(${service.accentRgb},${isActive ? '0.15' : '0.06'})`,
-            color: isActive ? service.accent : 'var(--muted-foreground)',
-            border: `1px solid rgba(${service.accentRgb},${isActive ? '0.3' : '0.08'})`,
-            transition: 'all 0.6s cubic-bezier(0.16,1,0.3,1)',
-            boxShadow: isActive
-              ? `0 0 24px rgba(${service.accentRgb},0.28), 0 0 60px rgba(${service.accentRgb},0.1), inset 0 1px 0 rgba(${service.accentRgb},0.2)`
-              : '0 2px 8px rgba(0,0,0,0.3)',
-            transform: isActive ? 'scale(1.08) translateY(-1px)' : 'scale(1)',
-          }}>
-            {service.icon}
-          </div>
-
-          {/* Title */}
-          <h3 className="text-[22px] font-extrabold tracking-tight text-foreground leading-tight">
-            {service.title}
-          </h3>
-
-          {/* Description */}
-          <p className="text-sm leading-[1.88] font-light flex-grow" style={{
-            color: isActive ? 'rgba(237,233,227,0.75)' : 'var(--muted-foreground)',
-            transition: 'color 0.6s ease',
-          }}>
-            {service.description}
-          </p>
-
-          {/* Stats row */}
-          <div className="grid grid-cols-2 gap-3">
-            {service.stats.map((stat, si) => (
-              <div key={stat.label} className="rounded-2xl px-4 py-3 relative overflow-hidden" style={{
-                background: isActive
-                  ? `linear-gradient(135deg, rgba(${service.accentRgb},0.09) 0%, rgba(${service.accentRgb},0.04) 100%)`
-                  : `rgba(${service.accentRgb},0.03)`,
-                border: `1px solid rgba(${service.accentRgb},${isActive ? '0.2' : '0.07'})`,
-                boxShadow: isActive ? `inset 0 1px 0 rgba(${service.accentRgb},0.12)` : 'none',
+          {/* Stage 1: Tag + Number */}
+          <Reveal revealed={r(1)} delay={0} from="bottom" distance={20} duration={800}>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold tracking-[0.22em] uppercase px-3 py-1.5 rounded-full" style={{
+                color: service.accent,
+                background: `rgba(${service.accentRgb},${isActive ? '0.13' : '0.07'})`,
+                border: `1px solid rgba(${service.accentRgb},${isActive ? '0.28' : '0.15'})`,
+                boxShadow: isActive ? `0 0 18px rgba(${service.accentRgb},0.2), inset 0 1px 0 rgba(${service.accentRgb},0.15)` : 'none',
                 transition: 'all 0.6s ease',
-                transitionDelay: `${si * 40}ms`,
               }}>
-                <p className="text-lg font-black tracking-tight" style={{
-                  color: isActive ? service.accent : 'var(--foreground)',
-                  textShadow: isActive ? `0 0 18px rgba(${service.accentRgb},0.4)` : 'none',
-                  transition: 'color 0.6s ease, text-shadow 0.6s ease',
-                }}>
-                  {stat.value}
-                </p>
-                <p className="text-[10px] text-muted-foreground font-medium tracking-wide mt-0.5">
-                  {stat.label}
-                </p>
-              </div>
-            ))}
-          </div>
+                {service.tag}
+              </span>
+              <span className="text-5xl font-black tracking-tighter tabular-nums" style={{
+                color: isActive ? service.accent : 'rgba(107,107,128,0.12)',
+                transition: 'color 0.7s ease, text-shadow 0.7s ease',
+                lineHeight: 1,
+                textShadow: isActive ? `0 0 35px rgba(${service.accentRgb},0.45)` : 'none',
+              }}>
+                {service.number}
+              </span>
+            </div>
+          </Reveal>
 
-          {/* Detail line + arrow */}
-          <div className="flex items-center justify-between pt-1">
-            <p className="text-xs font-medium tracking-wide" style={{
-              color: isActive ? service.accent : 'rgba(107,107,128,0.35)',
+          {/* Stage 2: Icon */}
+          <Reveal revealed={r(2)} delay={0} from="scale" distance={16} duration={900}>
+            <div className="w-13 h-13 rounded-2xl flex items-center justify-center relative" style={{
+              width: '52px', height: '52px',
+              background: `rgba(${service.accentRgb},${isActive ? '0.15' : '0.06'})`,
+              color: isActive ? service.accent : 'var(--muted-foreground)',
+              border: `1px solid rgba(${service.accentRgb},${isActive ? '0.3' : '0.08'})`,
+              transition: 'all 0.6s cubic-bezier(0.16,1,0.3,1)',
+              boxShadow: isActive
+                ? `0 0 24px rgba(${service.accentRgb},0.28), 0 0 60px rgba(${service.accentRgb},0.1), inset 0 1px 0 rgba(${service.accentRgb},0.2)`
+                : '0 2px 8px rgba(0,0,0,0.3)',
+              transform: isActive ? 'scale(1.08) translateY(-1px)' : 'scale(1)',
+            }}>
+              {service.icon}
+            </div>
+          </Reveal>
+
+          {/* Stage 3: Title */}
+          <Reveal revealed={r(3)} delay={0} from="left" distance={24} duration={950}>
+            <h3 className="text-[22px] font-extrabold tracking-tight text-foreground leading-tight">
+              {service.title}
+            </h3>
+          </Reveal>
+
+          {/* Stage 4: Description */}
+          <Reveal revealed={r(4)} delay={0} from="bottom" distance={18} duration={1000}>
+            <p className="text-sm leading-[1.88] font-light flex-grow" style={{
+              color: isActive ? 'rgba(237,233,227,0.75)' : 'var(--muted-foreground)',
               transition: 'color 0.6s ease',
             }}>
-              {service.detail}
+              {service.description}
             </p>
-            <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{
-              background: isActive
-                ? `linear-gradient(135deg, rgba(${service.accentRgb},0.2), rgba(${service.accentRgb},0.1))`
-                : `rgba(${service.accentRgb},0.04)`,
-              border: `1px solid rgba(${service.accentRgb},${isActive ? '0.35' : '0.08'})`,
-              color: isActive ? service.accent : 'var(--muted-foreground)',
-              transform: isActive ? 'translateX(5px) scale(1.1)' : 'translateX(0) scale(1)',
-              boxShadow: isActive ? `0 0 16px rgba(${service.accentRgb},0.25)` : 'none',
-              transition: 'all 0.5s cubic-bezier(0.16,1,0.3,1)',
-            }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-          </div>
+          </Reveal>
 
-          {/* Bottom progress bar */}
-          <div className="h-px rounded-full overflow-hidden" style={{ background: 'rgba(22,22,38,1)' }}>
+          {/* Stage 5: Stats */}
+          <Reveal revealed={r(5)} delay={0} from="bottom" distance={22} duration={1000}>
+            <div className="grid grid-cols-2 gap-3">
+              {service.stats.map((stat, si) => (
+                <div key={stat.label} className="rounded-2xl px-4 py-3 relative overflow-hidden" style={{
+                  background: isActive
+                    ? `linear-gradient(135deg, rgba(${service.accentRgb},0.09) 0%, rgba(${service.accentRgb},0.04) 100%)`
+                    : `rgba(${service.accentRgb},0.03)`,
+                  border: `1px solid rgba(${service.accentRgb},${isActive ? '0.2' : '0.07'})`,
+                  boxShadow: isActive ? `inset 0 1px 0 rgba(${service.accentRgb},0.12)` : 'none',
+                  transition: 'all 0.6s ease',
+                  transitionDelay: `${si * 40}ms`,
+                  /* Subtle stagger within stats */
+                  opacity: r(5) ? 1 : 0,
+                  transform: r(5) ? 'translateY(0)' : 'translateY(14px)',
+                }}>
+                  <p className="text-lg font-black tracking-tight" style={{
+                    color: isActive ? service.accent : 'var(--foreground)',
+                    textShadow: isActive ? `0 0 18px rgba(${service.accentRgb},0.4)` : 'none',
+                    transition: 'color 0.6s ease, text-shadow 0.6s ease',
+                  }}>
+                    {stat.value}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground font-medium tracking-wide mt-0.5">
+                    {stat.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </Reveal>
+
+          {/* Stage 6: Detail + Arrow */}
+          <Reveal revealed={r(6)} delay={0} from="right" distance={20} duration={900}>
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-xs font-medium tracking-wide" style={{
+                color: isActive ? service.accent : 'rgba(107,107,128,0.35)',
+                transition: 'color 0.6s ease',
+              }}>
+                {service.detail}
+              </p>
+              <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{
+                background: isActive
+                  ? `linear-gradient(135deg, rgba(${service.accentRgb},0.2), rgba(${service.accentRgb},0.1))`
+                  : `rgba(${service.accentRgb},0.04)`,
+                border: `1px solid rgba(${service.accentRgb},${isActive ? '0.35' : '0.08'})`,
+                color: isActive ? service.accent : 'var(--muted-foreground)',
+                transform: isActive ? 'translateX(5px) scale(1.1)' : 'translateX(0) scale(1)',
+                boxShadow: isActive ? `0 0 16px rgba(${service.accentRgb},0.25)` : 'none',
+                transition: 'all 0.5s cubic-bezier(0.16,1,0.3,1)',
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            </div>
+          </Reveal>
+
+          {/* Stage 6: Progress bar — draws in like a line */}
+          <div className="h-px rounded-full overflow-hidden" style={{
+            background: 'rgba(22,22,38,1)',
+            opacity: r(6) ? 1 : 0,
+            transition: 'opacity 0.6s ease',
+          }}>
             <div className="h-full rounded-full" style={{
-              width: isActive ? '100%' : '0%',
+              width: isActive ? '100%' : r(6) ? '30%' : '0%',
               background: `linear-gradient(90deg, transparent 0%, rgba(${service.accentRgb},0.4) 20%, ${service.accent} 50%, rgba(${service.accentRgb},0.4) 80%, transparent 100%)`,
               boxShadow: isActive ? `0 0 8px rgba(${service.accentRgb},0.5)` : 'none',
-              transition: 'width 1s cubic-bezier(0.16,1,0.3,1), box-shadow 0.6s ease',
+              transition: 'width 1.4s cubic-bezier(0.16,1,0.3,1), box-shadow 0.6s ease',
             }} />
           </div>
         </div>
@@ -508,36 +542,56 @@ export default function ServicesSection() {
         <div ref={headingRef} className="mb-12">
           <div className="inline-flex items-center gap-2.5 mb-6" style={{
             opacity: headingVisible ? 1 : 0,
-            transform: headingVisible ? 'translateY(0)' : 'translateY(24px)',
-            transition: 'opacity 0.9s cubic-bezier(0.16,1,0.3,1), transform 0.9s cubic-bezier(0.16,1,0.3,1)',
+            transform: headingVisible ? 'translateY(0) scaleX(1)' : 'translateY(16px) scaleX(0.9)',
+            transformOrigin: 'left center',
+            transition: 'opacity 1s cubic-bezier(0.16,1,0.3,1), transform 1s cubic-bezier(0.16,1,0.3,1)',
           }}>
-            <div className="w-6 h-px" style={{ background: 'rgba(201,169,110,0.6)' }} />
+            <div style={{
+              width: headingVisible ? '24px' : '0px',
+              height: '1px',
+              background: 'rgba(201,169,110,0.6)',
+              transition: 'width 1.2s cubic-bezier(0.16,1,0.3,1) 0.2s',
+            }} />
             <span className="text-[10px] font-bold tracking-[0.25em] uppercase" style={{ color: 'rgba(201,169,110,0.8)' }}>
               What We Create
             </span>
           </div>
 
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-            <h2 className="text-[clamp(1.5rem,5vw,3rem)] font-black tracking-tighter text-foreground leading-[0.95] max-w-xl" style={{
-              opacity: headingVisible ? 1 : 0,
-              transform: headingVisible ? 'translateY(0)' : 'translateY(32px)',
-              transition: 'opacity 1s cubic-bezier(0.16,1,0.3,1) 120ms, transform 1s cubic-bezier(0.16,1,0.3,1) 120ms',
-            }}>
-              Services Built<br />for{' '}
-              <span style={{
-                background: 'linear-gradient(135deg, #B8935A 0%, #E8D4A0 45%, #D4B87A 75%, #C9A96E 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-              }}>
-                Modern Beauty
+            {/* Title with word-by-word reveal */}
+            <h2 className="text-[clamp(1.5rem,5vw,3rem)] font-black tracking-tighter leading-[0.95] max-w-xl overflow-hidden">
+              {['Services', 'Built', 'for'].map((word, i) => (
+                <span key={word} className="inline-block overflow-hidden mr-[0.22em]">
+                  <span style={{
+                    display: 'inline-block',
+                    color: 'var(--foreground)',
+                    opacity: headingVisible ? 1 : 0,
+                    transform: headingVisible ? 'translateY(0)' : 'translateY(100%)',
+                    transition: `opacity 0.8s cubic-bezier(0.16,1,0.3,1) ${200 + i * 100}ms,
+                                 transform 0.9s cubic-bezier(0.16,1,0.3,1) ${200 + i * 100}ms`,
+                  }}>{word}</span>
+                </span>
+              ))}{' '}
+              <span className="inline-block overflow-hidden">
+                <span style={{
+                  display: 'inline-block',
+                  background: 'linear-gradient(135deg, #B8935A 0%, #E8D4A0 45%, #D4B87A 75%, #C9A96E 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                  opacity: headingVisible ? 1 : 0,
+                  transform: headingVisible ? 'translateY(0)' : 'translateY(100%)',
+                  transition: `opacity 0.9s cubic-bezier(0.16,1,0.3,1) 550ms,
+                               transform 1s cubic-bezier(0.16,1,0.3,1) 550ms`,
+                  filter: headingVisible ? 'blur(0px)' : 'blur(6px)',
+                }}>Modern Beauty</span>
               </span>
             </h2>
 
             <p className="text-sm text-muted-foreground font-light max-w-xs leading-[1.8] md:text-right" style={{
               opacity: headingVisible ? 1 : 0,
               transform: headingVisible ? 'translateY(0)' : 'translateY(20px)',
-              transition: 'opacity 1s ease 240ms, transform 1s ease 240ms',
+              transition: 'opacity 1s ease 400ms, transform 1s ease 400ms',
             }}>
               Three core disciplines that transform how luxury brands produce and distribute visual content.
             </p>
