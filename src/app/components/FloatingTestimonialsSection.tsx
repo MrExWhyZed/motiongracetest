@@ -252,7 +252,6 @@ export default function FloatingTestimonialsSection() {
         }}
       >
         {testimonials.map((item, i) => (
-          {/* @ts-expect-error React 19 key prop inference */
           <TestimonialCard
             key={i}
             item={item}

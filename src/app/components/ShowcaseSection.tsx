@@ -397,7 +397,6 @@ export default function ShowcaseSection() {
           }}
         >
           {allItems.map((item, i) => (
-            {/* @ts-expect-error React 19 key prop inference */
             <ShowcaseCard
               key={`${item.id}-${i}`}
               item={item}
