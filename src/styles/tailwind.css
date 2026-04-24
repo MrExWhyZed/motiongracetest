@@ -309,3 +309,67 @@
   z-index: 50;
   pointer-events: auto;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   SCROLL NARRATIVE — Global cohesion animations
+═══════════════════════════════════════════════════════════════════ */
+
+/* Shared easing curve used across all section transitions */
+:root {
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-enter: 0.8s;
+  --duration-long: 1.2s;
+}
+
+/* Smooth scrolling globally */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Section entrance — common class usable across all sections */
+.section-enter {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity var(--duration-enter) var(--ease-spring),
+              transform var(--duration-enter) var(--ease-spring);
+}
+.section-enter.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Text gradient gold — shared */
+.text-gradient-gold {
+  background: linear-gradient(135deg, #8B6F3E 0%, #F2E4C4 40%, #D4A96A 70%, #C9956E 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Glass card — shared */
+.glass-dark {
+  background: rgba(10, 10, 18, 0.65);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Mask reveal animation — shared */
+@keyframes mask-reveal-up {
+  from { clip-path: inset(0 0 100% 0); opacity: 0; }
+  to   { clip-path: inset(0 0 0% 0);   opacity: 1; }
+}
+
+/* Scroll-linked particle rise — shared */
+@keyframes particle-rise {
+  0%   { transform: translateY(0)   scale(1);   opacity: 0; }
+  15%  { opacity: 1; }
+  85%  { opacity: 0.5; }
+  100% { transform: translateY(-80px) scale(0.3); opacity: 0; }
+}
+
+/* Orbit spin — shared for decorative rings */
+@keyframes orbit-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
