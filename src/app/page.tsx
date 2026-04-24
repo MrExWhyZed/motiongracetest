@@ -4,6 +4,8 @@ import Footer from '@/components/Footer';
 import HeroSection from '@/app/components/HeroSection';
 import HeroBridge from '@/app/components/HeroBridge';
 import ProblemSection from '@/app/components/ProblemSection';
+import SolutionBridge from '@/app/components/SolutionBridge';
+import ServicesSection from '@/app/components/ServicesSection';
 import ProcessSection from '@/app/components/ProcessSection';
 import TransformationSection from '@/app/components/TransformationSection';
 import ShowcaseSection from '@/app/components/ShowcaseSection';
@@ -26,19 +28,25 @@ export default function HomePage() {
       {/* 2. Problem — glitch / uneasy / frustration */}
       <ProblemSection />
 
-      {/* 3. Process — clarity / structure / sticky storytelling */}
+      {/* Cinematic transition: chaos → clarity */}
+      <SolutionBridge />
+
+      {/* 3. Services — the solution revealed */}
+      <ServicesSection />
+
+      {/* 4. Process — clarity / structure / sticky storytelling */}
       <ProcessSection />
 
-      {/* 4. Transformation — before vs after, the upgrade */}
+      {/* 5. Transformation — before vs after, the upgrade */}
       <TransformationSection />
 
-      {/* 5. Showcase — premium auto-scroll with 3D tilt + depth */}
+      {/* 6. Showcase — premium auto-scroll with 3D tilt + depth */}
       <ShowcaseSection />
 
-      {/* 6. Testimonials — floating, drifting, alive social proof */}
+      {/* 7. Testimonials — floating, drifting, alive social proof */}
       <FloatingTestimonialsSection />
 
-      {/* 7. CTA */}
+      {/* 8. CTA */}
       <CTASection />
 
       <Footer />
