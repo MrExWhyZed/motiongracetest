@@ -25,12 +25,12 @@ const painPoints = [
 ];
 
 const revealWords = [
-  { word: 'There', type: 'plain' },
-  { word: 'is', type: 'plain' },
-  { word: 'a', type: 'plain' },
-  { word: 'Better', type: 'highlight' },
-  { word: 'Way', type: 'highlight' },
-  { word: 'with', type: 'plain' },
+  { word: 'There ', type: 'plain' },
+  { word: 'is ', type: 'plain' },
+  { word: 'a ', type: 'plain' },
+  { word: 'Better ', type: 'highlight' },
+  { word: 'Way ', type: 'highlight' },
+  { word: 'with ', type: 'plain' },
   { word: 'MotionGrace.', type: 'brand' },
 ];
 
