@@ -4,7 +4,6 @@ import Footer from '@/components/Footer';
 import HeroSection from '@/app/components/HeroSection';
 import HeroBridge from '@/app/components/HeroBridge';
 import ProblemSection from '@/app/components/ProblemSection';
-import SolutionBridge from '@/app/components/SolutionBridge';
 import ServicesSection from '@/app/components/ServicesSection';
 import ProcessSection from '@/app/components/ProcessSection';
 import TransformationSection from '@/app/components/TransformationSection';
@@ -27,9 +26,6 @@ export default function HomePage() {
 
       {/* 2. Problem — glitch / uneasy / frustration */}
       <ProblemSection />
-
-      {/* Cinematic transition: chaos → clarity */}
-      <SolutionBridge />
 
       {/* 3. Services — the solution revealed */}
       <ServicesSection />
