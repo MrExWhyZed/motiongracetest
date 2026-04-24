@@ -26,14 +26,20 @@ const painPoints = [
   { label: 'Final asset count', value: '≈20 images', color: '#ffa94d' },
 ];
 
-const revealPhrases = [
-  { word: 'There', type: 'plain' },
-  { word: 'is', type: 'plain' },
-  { word: 'a', type: 'plain' },
-  { word: 'Better', type: 'highlight' },
-  { word: 'Way.', type: 'highlight' },
-  { word: 'Try', type: 'plain' },
-  { word: 'MotionGrace.', type: 'brand' },
+/* Screen 2 — three-line reveal structure */
+const revealLines = [
+  {
+    words: ['There', 'is', 'a'],
+    type: 'plain' as const,
+  },
+  {
+    words: ['Better', 'Way.'],
+    type: 'highlight' as const,
+  },
+  {
+    words: ['Try', 'MotionGrace.'],
+    type: 'brand' as const,
+  },
 ];
 
 const SHAPES = [
@@ -53,6 +59,13 @@ const SHAPES = [
 
 const ACCENTS = ['#C9A96E', '#8B7FD4', '#4A9EFF'];
 
+function easeOutExpo(t: number): number {
+  return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+}
+function easeInOutSine(t: number): number {
+  return -(Math.cos(Math.PI * t) - 1) / 2;
+}
+
 export default function ProblemSection() {
   const screen1Ref   = useRef<HTMLElement>(null);
   const screen2Ref   = useRef<HTMLElement>(null);
@@ -68,9 +81,8 @@ export default function ProblemSection() {
   const [arrowDone, setArrowDone]         = useState(false);
   const [transitionOut, setTransitionOut] = useState(false);
 
-  const glowTriggered  = useRef(false);
-  const arrowDoneRef   = useRef(false);
-  const transitionDone = useRef(false);
+  // Track previous raw scroll value to detect direction and reset state
+  const glowTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* mouse */
   useEffect(() => {
@@ -170,7 +182,7 @@ export default function ProblemSection() {
     };
   }, []);
 
-  /* scroll */
+  /* scroll — fully bidirectional, all state derived from position */
   const handleScroll = useCallback(() => {
     if (screen1Ref.current) {
       const rect = screen1Ref.current.getBoundingClientRect();
@@ -181,31 +193,40 @@ export default function ProblemSection() {
     }
 
     if (screen2Ref.current) {
-      const rect  = screen2Ref.current.getBoundingClientRect();
-      const vh    = window.innerHeight;
-      const total = screen2Ref.current.offsetHeight - vh;
+      const rect     = screen2Ref.current.getBoundingClientRect();
+      const vh       = window.innerHeight;
+      const total    = screen2Ref.current.offsetHeight - vh;
       const scrolled = -rect.top;
-      const raw = Math.max(0, Math.min(1, total > 0 ? scrolled / total : 0));
+      const raw      = Math.max(0, Math.min(1, total > 0 ? scrolled / total : 0));
 
+      // word reveal: first half of scroll range
       const wp = Math.max(0, Math.min(1, raw * 2));
       setWordProgress(wp);
 
-      if (wp > 0.92 && !glowTriggered.current) {
-        glowTriggered.current = true;
-        setTimeout(() => setGlowPulse(true), 400);
+      // glow pulse: reactive to position, debounced on entry only
+      if (wp > 0.92) {
+        if (glowTimerRef.current === null) {
+          glowTimerRef.current = setTimeout(() => setGlowPulse(true), 400);
+        }
+      } else {
+        if (glowTimerRef.current !== null) {
+          clearTimeout(glowTimerRef.current);
+          glowTimerRef.current = null;
+        }
+        setGlowPulse(false);
       }
 
+      // arrow fill: second half of scroll range
       const arrowRaw = Math.max(0, Math.min(1, (raw - 0.5) * 2));
       setArrowFill(arrowRaw);
 
-      if (arrowRaw >= 0.99 && !arrowDoneRef.current) {
-        arrowDoneRef.current = true;
+      // transition: set on completion, reset with hysteresis on backward scroll
+      if (arrowRaw >= 0.99) {
         setArrowDone(true);
-        setTimeout(() => {
-          if (transitionDone.current) return;
-          transitionDone.current = true;
-          setTransitionOut(true);
-        }, 800);
+        setTransitionOut(true);
+      } else if (arrowRaw < 0.92) {
+        setArrowDone(false);
+        setTransitionOut(false);
       }
     }
   }, []);
@@ -213,8 +234,21 @@ export default function ProblemSection() {
   useEffect(() => {
     window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (glowTimerRef.current !== null) clearTimeout(glowTimerRef.current);
+    };
   }, [handleScroll]);
+
+  /* word-level progress per line/word */
+  const TOTAL_WORDS = revealLines.reduce((s, l) => s + l.words.length, 0);
+  let wordIdx = 0;
+  const wordEntries: { lineIdx: number; wordIdx: number; globalIdx: number; word: string; type: 'plain' | 'highlight' | 'brand' }[] = [];
+  revealLines.forEach((line, li) => {
+    line.words.forEach((word, wi) => {
+      wordEntries.push({ lineIdx: li, wordIdx: wi, globalIdx: wordIdx++, word, type: line.type });
+    });
+  });
 
   return (
     <>
@@ -276,218 +310,272 @@ export default function ProblemSection() {
         </div>
       </section>
 
-      {/* ═══ SCREEN 2 — extended 3× scroll height ═══ */}
+      {/* ═══ SCREEN 2 — 3× scroll height ═══ */}
       <section ref={screen2Ref} className="relative" style={{ height: '340vh', background: 'transparent' }}>
         <div
           className="sticky top-0 overflow-hidden"
           style={{
             height: '100vh',
-            background: 'linear-gradient(to bottom, #060408 0%, #080810 60%, #06060E 100%)',
+            background: '#050508',
             opacity: transitionOut ? 0 : 1,
             transition: 'opacity 1.1s cubic-bezier(0.4,0,0.2,1)',
           }}
         >
           {/* 3D canvas */}
-          <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.9 }} />
+          <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.6 }} />
 
-          {/* Ambient radial */}
+          {/* Deep vignette */}
           <div className="absolute inset-0 pointer-events-none" style={{
-            background: 'radial-gradient(ellipse 70% 60% at 50% 50%, rgba(201,169,110,0.04) 0%, transparent 70%)',
-            filter: 'blur(40px)',
+            background: 'radial-gradient(ellipse 90% 80% at 50% 50%, transparent 20%, rgba(5,5,8,0.75) 100%)',
           }} />
 
-          {/* Center text zone */}
-          <div className="relative z-10 h-full flex flex-col items-center justify-center px-6">
+          {/* ── Horizontal light beam — cinematic reveal ── */}
+          <div
+            className="absolute pointer-events-none"
+            style={{
+              left: 0, right: 0,
+              top: '50%',
+              height: '1px',
+              background: `linear-gradient(90deg,
+                transparent 0%,
+                rgba(201,169,110,0) 15%,
+                rgba(201,169,110,${wordProgress * 0.18}) 35%,
+                rgba(255,240,200,${wordProgress * 0.28}) 50%,
+                rgba(201,169,110,${wordProgress * 0.18}) 65%,
+                rgba(201,169,110,0) 85%,
+                transparent 100%
+              )`,
+              transform: 'translateY(-50%)',
+              transition: 'none',
+              filter: `blur(${wordProgress > 0.5 ? 0 : 1}px)`,
+            }}
+          />
 
-            {/* Bloom */}
-            <div className="absolute pointer-events-none" style={{
-              width: '60vw', height: '50vh',
-              background: `radial-gradient(ellipse 80% 70% at 50% 50%, rgba(201,169,110,${glowPulse ? 0.12 : 0.02}) 0%, transparent 70%)`,
-              transition: 'all 1.4s ease', filter: 'blur(50px)',
-              animation: glowPulse ? 'reveal-glow-pulse 3.5s ease-in-out infinite 0.8s' : 'none',
-            }} />
+          {/* Bloom behind text — soft, restrained */}
+          <div className="absolute pointer-events-none" style={{
+            width: '55vw', height: '45vh',
+            left: '50%', top: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: `radial-gradient(ellipse 80% 70% at 50% 50%,
+              rgba(201,169,110,${glowPulse ? 0.055 : wordProgress * 0.025}) 0%,
+              transparent 70%)`,
+            filter: 'blur(60px)',
+            transition: glowPulse ? 'background 2s ease' : 'background 0.3s ease',
+            animation: glowPulse ? 'subtle-bloom 5s ease-in-out infinite' : 'none',
+          }} />
 
-            {/* Word reveal */}
-            <div className="flex flex-wrap justify-center items-baseline text-center" style={{ perspective: '900px', perspectiveOrigin: '50% 50%', gap: '0.1em 0.32em' }}>
-              {revealPhrases.map((seg, i) => {
-                {revealPhrases.map((seg, i) => {
-  const n = revealPhrases.length;
-
-  // smoother distribution
-  const start = (i / n) * 0.75;
-  const end = start + 0.28;
-
-  // raw progress
-  let raw = (wordProgress - start) / (end - start);
-
-  // clamp (important for reverse scroll)
-  raw = Math.max(0, Math.min(1, raw));
-
-  // 🔥 premium easing (this is the key)
-  const easeOutExpo = (t: number) =>
-    t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
-
-  const localP = easeOutExpo(raw);
-
-  const isH = seg.type === 'highlight';
-  const isB = seg.type === 'brand';
-
-  return (
-    <span key={i} className="inline-block overflow-visible" style={{ verticalAlign: 'baseline' }}>
-      <span
-        style={{
-          display: 'inline-block',
-
-          fontSize: 'clamp(2.2rem, 6vw, 5rem)',
-          fontWeight: isB ? 900 : isH ? 800 : 300,
-          letterSpacing: isB ? '-0.03em' : isH ? '-0.025em' : '-0.01em',
-          lineHeight: 1.15,
-
-          // 🔥 PREMIUM MOTION
-          opacity: localP,
-
-          transform: `
-            translateY(${(1 - localP) * 90}%)
-            rotateX(${(1 - localP) * -55}deg)
-            scale(${0.82 + localP * 0.18})
-          `,
-
-          filter: `
-            blur(${(1 - localP) * 18}px)
-            brightness(${0.75 + localP * 0.25})
-          `,
-
-          // ❗ VERY IMPORTANT (scroll controls animation)
-          transition: 'none',
-
-          willChange: 'transform, opacity, filter',
-
-          // 🎨 COLOR LOGIC
-          color: isB
-            ? 'transparent'
-            : isH
-            ? `rgba(237,233,227,${0.6 + localP * 0.4})`
-            : `rgba(237,233,227,${0.3 + localP * 0.4})`,
-
-          background: isB
-            ? 'linear-gradient(135deg, #B8935A 0%, #F2E09E 42%, #D6BA7C 68%, #C9A96E 100%)'
-            : 'none',
-
-          WebkitBackgroundClip: isB ? 'text' : 'unset',
-          backgroundClip: isB ? 'text' : 'unset',
-
-          // ✨ subtle glow ramp (feels expensive)
-          textShadow:
-            localP > 0.85
-              ? '0 0 40px rgba(237,233,227,0.12)'
-              : 'none',
-        }}
-      >
-        {seg.word}
-      </span>
-    </span>
-  );
-})}
-
-            {/* Underline */}
-            <div className="flex justify-center mt-8">
-              <div style={{ height: '1px', width: '320px', overflow: 'hidden', opacity: wordProgress > 0.9 ? 1 : 0, transition: 'opacity 0.6s ease 0.3s' }}>
-                <div style={{
-                  height: '1px', width: wordProgress > 0.9 ? '100%' : '0%',
-                  background: 'linear-gradient(90deg, transparent 0%, rgba(201,169,110,0.3) 20%, rgba(201,169,110,0.6) 50%, rgba(201,169,110,0.3) 80%, transparent 100%)',
-                  transition: 'width 1.4s cubic-bezier(0.16,1,0.3,1) 0.2s',
-                }} />
-              </div>
-            </div>
-
-            {/* Keep scrolling hint */}
+          {/* ── Main text — three cinematic lines ── */}
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center"
+            style={{ gap: 0 }}
+          >
+            {/* Eyebrow — fades in when reveal starts */}
             <div style={{
-              position: 'absolute', bottom: '130px', left: '50%', transform: 'translateX(-50%)',
-              opacity: wordProgress > 0.85 && arrowFill < 0.08 ? 1 : 0, transition: 'opacity 0.8s ease', textAlign: 'center',
+              marginBottom: '2.5rem',
+              opacity: wordProgress > 0.1 ? wordProgress * 0.6 : 0,
+              transition: 'none',
+              display: 'flex', alignItems: 'center', gap: '12px',
             }}>
-              <span className="text-[9px] tracking-[0.28em] uppercase" style={{ color: 'rgba(201,169,110,0.4)' }}>Keep scrolling</span>
+              <div style={{ width: '32px', height: '1px', background: 'rgba(201,169,110,0.35)' }} />
+              <span style={{
+                fontSize: '9px',
+                letterSpacing: '0.35em',
+                textTransform: 'uppercase',
+                color: 'rgba(201,169,110,0.45)',
+                fontWeight: 400,
+              }}>The Alternative</span>
+              <div style={{ width: '32px', height: '1px', background: 'rgba(201,169,110,0.35)' }} />
+            </div>
+
+            {/* Three lines */}
+            {revealLines.map((line, li) => {
+              const lineStart = li / revealLines.length;
+              const lineEnd   = lineStart + 1 / revealLines.length;
+              const lineP = Math.max(0, Math.min(1, (wordProgress - lineStart) / (lineEnd - lineStart)));
+              const easedLineP = easeOutExpo(lineP);
+
+              const isBrand     = line.type === 'brand';
+              const isHighlight = line.type === 'highlight';
+              const isPlain     = line.type === 'plain';
+
+              return (
+                <div
+                  key={li}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    gap: isBrand ? '0.28em' : '0.22em',
+                    marginBottom: li < revealLines.length - 1 ? '0.05em' : 0,
+                    lineHeight: 1,
+                  }}
+                >
+                  {line.words.map((word, wi) => {
+                    /* stagger within the line */
+                    const wordStart = (wi / line.words.length) * 0.55;
+                    const wordEnd   = wordStart + 0.6;
+                    const wRaw = Math.max(0, Math.min(1, (lineP - wordStart) / (wordEnd - wordStart)));
+                    const wp2 = easeOutExpo(wRaw);
+
+                    const isBrandWord = isBrand && word === 'MotionGrace.';
+
+                    const baseSize = isBrand
+                      ? 'clamp(3.2rem, 8.5vw, 8.5rem)'
+                      : isHighlight
+                      ? 'clamp(3.2rem, 8.5vw, 8.5rem)'
+                      : 'clamp(2rem, 5.2vw, 5rem)';
+
+                    const fw = isBrand ? 800 : isHighlight ? 700 : 300;
+
+                    return (
+                      <span
+                        key={wi}
+                        style={{
+                          display: 'inline-block',
+                          fontSize: baseSize,
+                          fontWeight: fw,
+                          letterSpacing: isBrand ? '-0.035em' : isHighlight ? '-0.03em' : '-0.015em',
+                          lineHeight: 1.05,
+
+                          /* motion */
+                          opacity: wp2,
+                          transform: `
+                            translateY(${(1 - wp2) * 60}%)
+                            skewY(${(1 - wp2) * -4}deg)
+                          `,
+                          filter: `blur(${(1 - wp2) * 12}px)`,
+                          transition: 'none',
+                          willChange: 'transform, opacity, filter',
+
+                          /* color */
+                          color: isBrandWord
+                            ? 'transparent'
+                            : isHighlight
+                            ? `rgba(237,233,227,${0.55 + wp2 * 0.45})`
+                            : `rgba(237,233,227,${0.22 + wp2 * 0.38})`,
+
+                          background: isBrandWord
+                            ? 'linear-gradient(118deg, #9A7040 0%, #C9A96E 22%, #F0D898 48%, #D4AA6A 72%, #B8935A 100%)'
+                            : 'none',
+
+                          WebkitBackgroundClip: isBrandWord ? 'text' : 'unset',
+                          backgroundClip: isBrandWord ? 'text' : 'unset',
+
+                          /* subtle letter-spacing on plain words so they feel airy */
+                          marginRight: isPlain && wi < line.words.length - 1 ? '0.05em' : 0,
+                        }}
+                      >
+                        {word}
+                      </span>
+                    );
+                  })}
+                </div>
+              );
+            })}
+
+            {/* Ruled line — draws in after all words visible, reverses on backward scroll */}
+            <div style={{
+              marginTop: '3rem',
+              width: '100%',
+              maxWidth: '520px',
+              height: '1px',
+              overflow: 'hidden',
+              opacity: wordProgress > 0.88 ? Math.min(1, (wordProgress - 0.88) * 8) : 0,
+              transition: 'none',
+            }}>
+              <div style={{
+                height: '1px',
+                width: `${Math.min(100, Math.max(0, (wordProgress - 0.88) / 0.12 * 100))}%`,
+                background: 'linear-gradient(90deg, transparent 0%, rgba(201,169,110,0.2) 20%, rgba(201,169,110,0.45) 50%, rgba(201,169,110,0.2) 80%, transparent 100%)',
+                transition: 'none',
+              }} />
+            </div>
+
+            {/* Subline — appears last */}
+            <div style={{
+              marginTop: '1.5rem',
+              opacity: wordProgress > 0.94 ? (wordProgress - 0.94) * 16 : 0,
+              transform: `translateY(${wordProgress > 0.94 ? 0 : 8}px)`,
+              transition: 'none',
+            }}>
+              <span style={{
+                fontSize: '11px',
+                letterSpacing: '0.28em',
+                textTransform: 'uppercase',
+                color: 'rgba(201,169,110,0.38)',
+                fontWeight: 400,
+              }}>AI-powered product visuals</span>
             </div>
           </div>
 
-          {/* ── Scroll Progress Arrow — futuristic pill ── */}
+          {/* ── Minimal scroll indicator ── */}
           <div style={{
-            position: 'absolute', bottom: '36px', left: '50%', transform: 'translateX(-50%)',
-            opacity: arrowDone ? 0 : wordProgress > 0.7 ? 1 : 0,
-            transition: arrowDone ? 'opacity 0.6s ease' : 'opacity 1s ease',
-            pointerEvents: 'none', zIndex: 20,
+            position: 'absolute',
+            bottom: '44px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            opacity: arrowDone
+              ? 0
+              : wordProgress > 0.72
+              ? Math.min(1, (wordProgress - 0.72) * 4)
+              : 0,
+            transition: arrowDone ? 'opacity 0.5s ease' : 'opacity 0.8s ease',
+            pointerEvents: 'none',
+            zIndex: 20,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '10px',
           }}>
-            <svg width="44" height="68" viewBox="0 0 44 68" fill="none" xmlns="http://www.w3.org/2000/svg"
-              style={{ filter: arrowFill > 0.95 ? 'drop-shadow(0 0 12px rgba(201,169,110,0.7))' : 'drop-shadow(0 0 4px rgba(201,169,110,0.2))' }}
-            >
-              <defs>
-                <linearGradient id="arrowGrad" x1="0" y1="0" x2="0" y2="68" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stopColor="#C9A96E" stopOpacity="0.9"/>
-                  <stop offset="100%" stopColor="#F2E09E" stopOpacity="0.5"/>
-                </linearGradient>
-                <clipPath id="pillClip">
-                  <rect x="0" y="0" width="44" height="68" rx="22"/>
-                </clipPath>
-              </defs>
+            {/* Label */}
+            <span style={{
+              fontSize: '8px',
+              letterSpacing: '0.32em',
+              textTransform: 'uppercase',
+              color: `rgba(201,169,110,${0.2 + arrowFill * 0.3})`,
+              fontWeight: 400,
+              transition: 'color 0.3s ease',
+            }}>scroll</span>
 
-              {/* Outer border — always visible, ultra thin */}
-              <rect x="0.75" y="0.75" width="42.5" height="66.5" rx="21.25"
-                stroke="rgba(201,169,110,0.15)" strokeWidth="0.75" fill="none" />
+            {/* Track + fill line */}
+            <div style={{
+              position: 'relative',
+              width: '1px',
+              height: '52px',
+              background: 'rgba(201,169,110,0.12)',
+            }}>
+              {/* Animated fill */}
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '1px',
+                height: `${arrowFill * 100}%`,
+                background: `rgba(201,169,110,${0.4 + arrowFill * 0.5})`,
+                transition: 'height 0.06s linear',
+                boxShadow: arrowFill > 0.7 ? '0 0 6px rgba(201,169,110,0.5)' : 'none',
+              }} />
 
-              {/* Progress stroke — draws around the pill */}
-              <rect x="0.75" y="0.75" width="42.5" height="66.5" rx="21.25"
-                stroke="url(#arrowGrad)"
-                strokeWidth="1.2"
-                fill="none"
-                strokeDasharray="218"
-                strokeDashoffset={218 - arrowFill * 218}
-                strokeLinecap="round"
-                style={{
-                  transformOrigin: '22px 34px',
-                  transform: 'rotate(-90deg)',
-                  transformBox: 'fill-box',
-                  transition: 'stroke-dashoffset 0.06s linear',
-                }}
-              />
-
-              {/* Scanline sweep — fills upward as progress increases */}
-              <rect
-                x="1" y={68 - arrowFill * 68} width="42" height={arrowFill * 68}
-                fill={`rgba(201,169,110,${arrowFill * 0.06})`}
-                rx="0"
-                clipPath="url(#pillClip)"
-                style={{ transition: 'y 0.06s linear, height 0.06s linear' }}
-              />
-
-              {/* Corner tick marks — top left */}
-              <line x1="1" y1="12" x2="1" y2="4" stroke="rgba(201,169,110,0.5)" strokeWidth="1" strokeLinecap="round"/>
-              <line x1="1" y1="4" x2="9" y2="4" stroke="rgba(201,169,110,0.5)" strokeWidth="1" strokeLinecap="round"/>
-              {/* top right */}
-              <line x1="43" y1="12" x2="43" y2="4" stroke="rgba(201,169,110,0.5)" strokeWidth="1" strokeLinecap="round"/>
-              <line x1="43" y1="4" x2="35" y2="4" stroke="rgba(201,169,110,0.5)" strokeWidth="1" strokeLinecap="round"/>
-              {/* bottom left */}
-              <line x1="1" y1="56" x2="1" y2="64" stroke="rgba(201,169,110,0.5)" strokeWidth="1" strokeLinecap="round"/>
-              <line x1="1" y1="64" x2="9" y2="64" stroke="rgba(201,169,110,0.5)" strokeWidth="1" strokeLinecap="round"/>
-              {/* bottom right */}
-              <line x1="43" y1="56" x2="43" y2="64" stroke="rgba(201,169,110,0.5)" strokeWidth="1" strokeLinecap="round"/>
-              <line x1="43" y1="64" x2="35" y2="64" stroke="rgba(201,169,110,0.5)" strokeWidth="1" strokeLinecap="round"/>
-
-              {/* Chevron — brighter as progress grows */}
-              <path
-                d="M22 26 L22 44 M14 37 L22 45 L30 37"
-                stroke={`rgba(201,169,110,${0.3 + arrowFill * 0.7})`}
-                strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"
-                style={{ transition: 'stroke 0.3s ease' }}
-              />
-            </svg>
+              {/* Dot at bottom of track */}
+              <div style={{
+                position: 'absolute',
+                bottom: '-3px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '3px',
+                height: '3px',
+                borderRadius: '50%',
+                background: `rgba(201,169,110,${0.25 + arrowFill * 0.6})`,
+                transition: 'background 0.3s ease',
+              }} />
+            </div>
           </div>
 
-          {/* Vignette edges */}
+          {/* Edge vignettes — top and bottom */}
           <div className="absolute inset-0 pointer-events-none" style={{
-            background: 'radial-gradient(ellipse 100% 100% at 50% 50%, transparent 40%, rgba(4,4,10,0.7) 100%)',
+            background: 'linear-gradient(to bottom, rgba(5,5,8,0.7) 0%, transparent 18%, transparent 82%, rgba(5,5,8,0.7) 100%)',
           }} />
+
         </div>
-
-
       </section>
 
       <style>{`
@@ -522,9 +610,9 @@ export default function ProblemSection() {
           90% { opacity: 0.6; }
           93% { opacity: 1; }
         }
-        @keyframes reveal-glow-pulse {
+        @keyframes subtle-bloom {
           0%, 100% { opacity: 1; }
-          50% { opacity: 0.45; }
+          50% { opacity: 0.55; }
         }
       `}</style>
     </>
