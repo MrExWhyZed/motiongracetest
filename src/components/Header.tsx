@@ -314,7 +314,6 @@ export default function Header() {
           <div className="flex items-center gap-2">
             {/* Contact Us — desktop */}
             <button onClick={handleContactOpen} className="hidden md:flex items-center gap-2 px-5 py-2.5 rounded-full text-[10px] font-semibold uppercase text-primary-foreground bg-primary hover:opacity-90 transition-all duration-700 animate-pulse-gold" aria-label="Open contact form">
-              <span className="pulse-dot" />
               Contact Us
             </button>
 
