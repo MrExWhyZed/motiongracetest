@@ -431,13 +431,13 @@ export default function Header() {
                 <div className="cf-grid">
                   <div className={`cf-field ${focusedField === 'name' ? 'focused' : ''}`}>
                     <label className="cf-label" htmlFor="cf-name">Full Name *</label>
-                    <input id="cf-name" className="cf-input" type="text" placeholder="Alex Johnson" required
+                    <input id="cf-name" className="cf-input" type="text" required
                       value={formData.name} onChange={e => handleChange('name', e.target.value)}
                       onFocus={() => setFocusedField('name')} onBlur={() => setFocusedField(null)} />
                   </div>
                   <div className={`cf-field ${focusedField === 'email' ? 'focused' : ''}`}>
                     <label className="cf-label" htmlFor="cf-email">Email Address *</label>
-                    <input id="cf-email" className="cf-input" type="email" placeholder="alex@company.com" required
+                    <input id="cf-email" className="cf-input" type="email" required
                       value={formData.email} onChange={e => handleChange('email', e.target.value)}
                       onFocus={() => setFocusedField('email')} onBlur={() => setFocusedField(null)} />
                   </div>
