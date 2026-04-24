@@ -37,8 +37,8 @@ export default function Header() {
       `}</style>
 
       <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-1000 ${
-          scrolled ? 'glass-dark py-3.5' : 'bg-transparent py-6'
+        className={`absolute top-0 left-0 right-0 z-50 transition-all duration-1000 ${
+          scrolled ? 'py-3.5' : 'bg-transparent py-6'
         }`}
       >
         <div className="max-w-7xl mx-auto px-6 sm:px-10 flex items-center justify-between">

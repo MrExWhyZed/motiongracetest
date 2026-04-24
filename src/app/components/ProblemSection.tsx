@@ -359,38 +359,74 @@ export default function ProblemSection() {
             </div>
           </div>
 
-          {/* ── Scroll Progress Arrow ── */}
+          {/* ── Scroll Progress Arrow — futuristic pill ── */}
           <div style={{
             position: 'absolute', bottom: '36px', left: '50%', transform: 'translateX(-50%)',
             opacity: arrowDone ? 0 : wordProgress > 0.7 ? 1 : 0,
-            transition: arrowDone ? 'opacity 0.5s ease' : 'opacity 0.8s ease',
+            transition: arrowDone ? 'opacity 0.6s ease' : 'opacity 1s ease',
             pointerEvents: 'none', zIndex: 20,
           }}>
-            <svg width="48" height="64" viewBox="0 0 48 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-              {/* Track ring */}
-              <rect x="1.5" y="1.5" width="45" height="61" rx="22.5" stroke="rgba(201,169,110,0.18)" strokeWidth="1.5" fill="none" />
-              {/* Filled progress ring */}
-              <rect
-                x="1.5" y="1.5" width="45" height="61" rx="22.5"
-                stroke={arrowFill > 0.95 ? '#F2E09E' : '#C9A96E'}
-                strokeWidth="1.8"
+            <svg width="44" height="68" viewBox="0 0 44 68" fill="none" xmlns="http://www.w3.org/2000/svg"
+              style={{ filter: arrowFill > 0.95 ? 'drop-shadow(0 0 12px rgba(201,169,110,0.7))' : 'drop-shadow(0 0 4px rgba(201,169,110,0.2))' }}
+            >
+              <defs>
+                <linearGradient id="arrowGrad" x1="0" y1="0" x2="0" y2="68" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#C9A96E" stopOpacity="0.9"/>
+                  <stop offset="100%" stopColor="#F2E09E" stopOpacity="0.5"/>
+                </linearGradient>
+                <clipPath id="pillClip">
+                  <rect x="0" y="0" width="44" height="68" rx="22"/>
+                </clipPath>
+              </defs>
+
+              {/* Outer border — always visible, ultra thin */}
+              <rect x="0.75" y="0.75" width="42.5" height="66.5" rx="21.25"
+                stroke="rgba(201,169,110,0.15)" strokeWidth="0.75" fill="none" />
+
+              {/* Progress stroke — draws around the pill */}
+              <rect x="0.75" y="0.75" width="42.5" height="66.5" rx="21.25"
+                stroke="url(#arrowGrad)"
+                strokeWidth="1.2"
                 fill="none"
-                strokeDasharray="208"
-                strokeDashoffset={208 - arrowFill * 208}
+                strokeDasharray="218"
+                strokeDashoffset={218 - arrowFill * 218}
                 strokeLinecap="round"
                 style={{
-                  transition: 'stroke-dashoffset 0.05s linear, stroke 0.3s ease',
-                  filter: arrowFill > 0.95 ? 'drop-shadow(0 0 10px rgba(242,224,158,0.9))' : 'none',
-                  transformOrigin: '24px 32px',
+                  transformOrigin: '22px 34px',
                   transform: 'rotate(-90deg)',
+                  transformBox: 'fill-box',
+                  transition: 'stroke-dashoffset 0.06s linear',
                 }}
               />
-              {/* Chevron */}
+
+              {/* Scanline sweep — fills upward as progress increases */}
+              <rect
+                x="1" y={68 - arrowFill * 68} width="42" height={arrowFill * 68}
+                fill={`rgba(201,169,110,${arrowFill * 0.06})`}
+                rx="0"
+                clipPath="url(#pillClip)"
+                style={{ transition: 'y 0.06s linear, height 0.06s linear' }}
+              />
+
+              {/* Corner tick marks — top left */}
+              <line x1="1" y1="12" x2="1" y2="4" stroke="rgba(201,169,110,0.5)" strokeWidth="1" strokeLinecap="round"/>
+              <line x1="1" y1="4" x2="9" y2="4" stroke="rgba(201,169,110,0.5)" strokeWidth="1" strokeLinecap="round"/>
+              {/* top right */}
+              <line x1="43" y1="12" x2="43" y2="4" stroke="rgba(201,169,110,0.5)" strokeWidth="1" strokeLinecap="round"/>
+              <line x1="43" y1="4" x2="35" y2="4" stroke="rgba(201,169,110,0.5)" strokeWidth="1" strokeLinecap="round"/>
+              {/* bottom left */}
+              <line x1="1" y1="56" x2="1" y2="64" stroke="rgba(201,169,110,0.5)" strokeWidth="1" strokeLinecap="round"/>
+              <line x1="1" y1="64" x2="9" y2="64" stroke="rgba(201,169,110,0.5)" strokeWidth="1" strokeLinecap="round"/>
+              {/* bottom right */}
+              <line x1="43" y1="56" x2="43" y2="64" stroke="rgba(201,169,110,0.5)" strokeWidth="1" strokeLinecap="round"/>
+              <line x1="43" y1="64" x2="35" y2="64" stroke="rgba(201,169,110,0.5)" strokeWidth="1" strokeLinecap="round"/>
+
+              {/* Chevron — brighter as progress grows */}
               <path
-                d="M24 20 L24 44 M14 34 L24 44 L34 34"
-                stroke={arrowFill > 0.5 ? '#C9A96E' : 'rgba(201,169,110,0.45)'}
-                strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-                style={{ transition: 'stroke 0.5s ease' }}
+                d="M22 26 L22 44 M14 37 L22 45 L30 37"
+                stroke={`rgba(201,169,110,${0.3 + arrowFill * 0.7})`}
+                strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"
+                style={{ transition: 'stroke 0.3s ease' }}
               />
             </svg>
           </div>
@@ -401,14 +437,7 @@ export default function ProblemSection() {
           }} />
         </div>
 
-        {/* Transition overlay */}
-        <div style={{
-          position: 'fixed', inset: 0,
-          background: 'linear-gradient(to bottom, rgba(6,4,8,0) 0%, rgba(6,4,8,0.95) 100%)',
-          opacity: transitionOut ? 1 : 0,
-          transition: 'opacity 1s ease',
-          pointerEvents: 'none', zIndex: 50,
-        }} />
+
       </section>
 
       <style>{`
