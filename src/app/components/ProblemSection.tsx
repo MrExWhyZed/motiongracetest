@@ -310,34 +310,84 @@ export default function ProblemSection() {
             {/* Word reveal */}
             <div className="flex flex-wrap justify-center items-baseline text-center" style={{ perspective: '900px', perspectiveOrigin: '50% 50%', gap: '0.1em 0.32em' }}>
               {revealPhrases.map((seg, i) => {
-                const n = revealPhrases.length;
-                const start  = (i / n) * 0.72;
-                const window = 0.2;
-                const localP = Math.max(0, Math.min(1, (wordProgress - start) / window));
-                const isH = seg.type === 'highlight';
-                const isB = seg.type === 'brand';
-                return (
-                  <span key={i} className="inline-block overflow-visible" style={{ verticalAlign: 'baseline' }}>
-                    <span style={{
-                      display: 'inline-block',
-                      fontSize: 'clamp(2.2rem, 6vw, 5rem)',
-                      fontWeight: isB ? 900 : isH ? 800 : 300,
-                      letterSpacing: isB ? '-0.03em' : isH ? '-0.025em' : '-0.01em',
-                      lineHeight: 1.15,
-                      filter: `blur(${(1 - localP) * 16}px)`,
-                      transform: `translateY(${(1 - localP) * 60}%) rotateX(${(1 - localP) * -30}deg) scale(${0.86 + localP * 0.14})`,
-                      opacity: localP,
-                      willChange: 'transform, opacity, filter',
-                      color: isB ? 'transparent' : isH ? 'rgba(237,233,227,1)' : 'rgba(237,233,227,0.55)',
-                      background: isB ? 'linear-gradient(135deg, #B8935A 0%, #F2E09E 42%, #D6BA7C 68%, #C9A96E 100%)' : 'none',
-                      WebkitBackgroundClip: isB ? 'text' : 'unset',
-                      backgroundClip: isB ? 'text' : 'unset',
-                      textShadow: !isB && isH && localP > 0.85 ? '0 0 60px rgba(237,233,227,0.2)' : 'none',
-                    }}>{seg.word}</span>
-                  </span>
-                );
-              })}
-            </div>
+                {revealPhrases.map((seg, i) => {
+  const n = revealPhrases.length;
+
+  // smoother distribution
+  const start = (i / n) * 0.75;
+  const end = start + 0.28;
+
+  // raw progress
+  let raw = (wordProgress - start) / (end - start);
+
+  // clamp (important for reverse scroll)
+  raw = Math.max(0, Math.min(1, raw));
+
+  // 🔥 premium easing (this is the key)
+  const easeOutExpo = (t: number) =>
+    t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+
+  const localP = easeOutExpo(raw);
+
+  const isH = seg.type === 'highlight';
+  const isB = seg.type === 'brand';
+
+  return (
+    <span key={i} className="inline-block overflow-visible" style={{ verticalAlign: 'baseline' }}>
+      <span
+        style={{
+          display: 'inline-block',
+
+          fontSize: 'clamp(2.2rem, 6vw, 5rem)',
+          fontWeight: isB ? 900 : isH ? 800 : 300,
+          letterSpacing: isB ? '-0.03em' : isH ? '-0.025em' : '-0.01em',
+          lineHeight: 1.15,
+
+          // 🔥 PREMIUM MOTION
+          opacity: localP,
+
+          transform: `
+            translateY(${(1 - localP) * 90}%)
+            rotateX(${(1 - localP) * -55}deg)
+            scale(${0.82 + localP * 0.18})
+          `,
+
+          filter: `
+            blur(${(1 - localP) * 18}px)
+            brightness(${0.75 + localP * 0.25})
+          `,
+
+          // ❗ VERY IMPORTANT (scroll controls animation)
+          transition: 'none',
+
+          willChange: 'transform, opacity, filter',
+
+          // 🎨 COLOR LOGIC
+          color: isB
+            ? 'transparent'
+            : isH
+            ? `rgba(237,233,227,${0.6 + localP * 0.4})`
+            : `rgba(237,233,227,${0.3 + localP * 0.4})`,
+
+          background: isB
+            ? 'linear-gradient(135deg, #B8935A 0%, #F2E09E 42%, #D6BA7C 68%, #C9A96E 100%)'
+            : 'none',
+
+          WebkitBackgroundClip: isB ? 'text' : 'unset',
+          backgroundClip: isB ? 'text' : 'unset',
+
+          // ✨ subtle glow ramp (feels expensive)
+          textShadow:
+            localP > 0.85
+              ? '0 0 40px rgba(237,233,227,0.12)'
+              : 'none',
+        }}
+      >
+        {seg.word}
+      </span>
+    </span>
+  );
+})}
 
             {/* Underline */}
             <div className="flex justify-center mt-8">
