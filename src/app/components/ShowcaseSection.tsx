@@ -745,7 +745,7 @@ export default function ShowcaseSection() {
         transition: 'opacity 0.6s ease',
       }}>
         <span style={{ fontSize: '9px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(237,233,227,0.4)' }}>
-          hover to explore · hold arrows to seek
+          Catelog
         </span>
       </div>
 
