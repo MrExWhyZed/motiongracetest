@@ -1,37 +1,18 @@
 'use client';
 
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
-import Link from 'next/link';
+import BackgroundGlow from './BackgroundGlow';
+import SiteHeader from './SiteHeader';
+import SuccessState from './SuccessState';
 
 export type FormValues = {
   name: string;
-  email: string;
   project_name: string;
   project_type: string;
   budget: string;
   description: string;
 };
-
-const PROJECT_TYPES = [
-  'Brand Film',
-  'Motion Identity',
-  'Title Sequence',
-  'Product Visualization',
-  'Explainer Video',
-  'Social Content Series',
-  'Immersive Installation',
-  'Other',
-];
-
-const BUDGET_RANGES = [
-  'Under $5,000',
-  '$5,000 — $15,000',
-  '$15,000 — $50,000',
-  '$50,000 — $100,000',
-  'Over $100,000',
-  "Let's discuss",
-];
 
 interface ReferenceImage {
   id: string;
@@ -40,36 +21,203 @@ interface ReferenceImage {
   name: string;
 }
 
+const PROJECT_TYPES = [
+  { value: 'brand-film', label: 'Brand Film' },
+  { value: 'motion-identity', label: 'Motion Identity' },
+  { value: 'title-sequence', label: 'Title Sequence' },
+  { value: 'product-visualization', label: 'Product Visualization' },
+  { value: 'explainer-video', label: 'Explainer Video' },
+  { value: 'social-content', label: 'Social Content Series' },
+  { value: 'immersive-installation', label: 'Immersive Installation' },
+  { value: 'other', label: 'Something else entirely' },
+];
+
+const BUDGET_RANGES = [
+  { value: 'under-5k', label: 'Under $5,000' },
+  { value: '5k-15k', label: '$5,000 — $15,000' },
+  { value: '15k-50k', label: '$15,000 — $50,000' },
+  { value: '50k-100k', label: '$50,000 — $100,000' },
+  { value: 'over-100k', label: 'Over $100,000' },
+  { value: 'discuss', label: "Let's discuss" },
+];
+
+const STEPS = [
+  { id: 1, label: 'You' },
+  { id: 2, label: 'Project' },
+  { id: 3, label: 'Vision' },
+  { id: 4, label: 'References' },
+];
+
 export default function AddProjectClient() {
-  const [selectedType, setSelectedType] = useState('');
-  const [selectedBudget, setSelectedBudget] = useState('');
-  const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [selectedType, setSelectedType] = useState('');
+  const [selectedBudget, setSelectedBudget] = useState('');
+  const [transitioning, setTransitioning] = useState(false);
+
+  const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const gsapRef = useRef<typeof import('gsap').gsap | null>(null);
 
   const {
     register,
     handleSubmit,
+    trigger,
     reset,
     formState: { errors },
   } = useForm<FormValues>({
-    defaultValues: { name: '', email: '', project_name: '', project_type: '', budget: '', description: '' },
+    defaultValues: { name: '', project_name: '', project_type: '', budget: '', description: '' },
   });
+
+  // Init GSAP and animate first step in
+  useEffect(() => {
+    let isMounted = true;
+    const init = async () => {
+      const { gsap } = await import('gsap');
+      if (!isMounted) return;
+      gsapRef.current = gsap;
+
+      const el = stepRefs.current[0];
+      if (!el) return;
+
+      // Curtain reveal: clip-path from bottom
+      gsap.set(el, { opacity: 1 });
+      gsap.fromTo(el,
+        { clipPath: 'inset(100% 0% 0% 0%)', filter: 'blur(12px)', scale: 0.97 },
+        { clipPath: 'inset(0% 0% 0% 0%)', filter: 'blur(0px)', scale: 1, duration: 1.0, ease: 'power4.out', delay: 0.15 }
+      );
+      const children = el.querySelectorAll('[data-animate]');
+      gsap.fromTo(children,
+        { opacity: 0, y: 28 },
+        { opacity: 1, y: 0, duration: 0.85, stagger: 0.1, ease: 'power3.out', delay: 0.35 }
+      );
+    };
+    init();
+    return () => { isMounted = false; };
+  }, []);
+
+  const transitionToStep = useCallback(async (nextStep: number) => {
+    if (transitioning) return;
+    setTransitioning(true);
+
+    const gsap = gsapRef.current;
+    const currentEl = stepRefs.current[currentStep - 1];
+    const nextEl = stepRefs.current[nextStep - 1];
+    const goingForward = nextStep > currentStep;
+
+    if (!gsap) {
+      setCurrentStep(nextStep);
+      setTransitioning(false);
+      return;
+    }
+
+    // Exit: curtain close (wipe direction depends on forward/back)
+    if (currentEl) {
+      await new Promise<void>((resolve) => {
+        gsap.to(currentEl, {
+          clipPath: goingForward ? 'inset(0% 0% 100% 0%)' : 'inset(0% 100% 0% 0%)',
+          filter: 'blur(8px)',
+          scale: goingForward ? 0.96 : 1.02,
+          duration: 0.55,
+          ease: 'power3.inOut',
+          onComplete: resolve,
+        });
+      });
+    }
+
+    setCurrentStep(nextStep);
+
+    // Slight pause — cinematic beat
+    await new Promise<void>((r) => setTimeout(r, 60));
+
+    // Enter: curtain open from opposite edge
+    if (nextEl) {
+      gsap.set(nextEl, {
+        clipPath: goingForward ? 'inset(100% 0% 0% 0%)' : 'inset(0% 0% 0% 100%)',
+        filter: 'blur(12px)',
+        scale: goingForward ? 1.03 : 0.97,
+        opacity: 1,
+      });
+      gsap.to(nextEl, {
+        clipPath: 'inset(0% 0% 0% 0%)',
+        filter: 'blur(0px)',
+        scale: 1,
+        duration: 0.75,
+        ease: 'power4.out',
+      });
+      const children = nextEl.querySelectorAll('[data-animate]');
+      gsap.fromTo(children,
+        { opacity: 0, y: goingForward ? 22 : -22 },
+        { opacity: 1, y: 0, duration: 0.7, stagger: 0.09, ease: 'power3.out', delay: 0.1 }
+      );
+    }
+
+    setTransitioning(false);
+  }, [currentStep, transitioning]);
+
+  const handleStep1Next = async () => {
+    const valid = await trigger(['name', 'project_name']);
+    if (valid) transitionToStep(2);
+  };
+  const handleStep2Next = () => transitionToStep(3);
+  const handleStep3Next = async () => {
+    const valid = await trigger(['description']);
+    if (valid) transitionToStep(4);
+  };
+  const handlePrev = (prevStep: number) => transitionToStep(prevStep);
+
+  const onSubmit = async (data: FormValues) => {
+    setIsSubmitting(true);
+    setSubmitError('');
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase.from('projects').insert({
+        user_id: user?.id ?? null,
+        name: data.name,
+        email: user?.email ?? null,
+        project_name: data.project_name,
+        project_type: selectedType || data.project_type,
+        description: data.description,
+        budget: selectedBudget || data.budget,
+        status: 'Draft',
+      });
+      if (error) throw error;
+
+      const gsap = gsapRef.current;
+      const currentEl = stepRefs.current[currentStep - 1];
+      if (gsap && currentEl) {
+        gsap.to(currentEl, {
+          clipPath: 'inset(0% 0% 100% 0%)',
+          filter: 'blur(8px)',
+          scale: 0.96,
+          duration: 0.55,
+          ease: 'power3.inOut',
+        });
+      }
+      setTimeout(() => setIsSuccess(true), 560);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+      setSubmitError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const addImages = useCallback((files: FileList | File[]) => {
     const fileArray = Array.from(files);
     const imageFiles = fileArray.filter((f) => f.type.startsWith('image/'));
-    const newImages: ReferenceImage[] = imageFiles
-      .slice(0, 6 - referenceImages.length)
-      .map((file) => ({
-        id: `${file.name}-${file.lastModified}`,
-        file,
-        preview: URL.createObjectURL(file),
-        name: file.name,
-      }));
+    const newImages: ReferenceImage[] = imageFiles.slice(0, 6 - referenceImages.length).map((file) => ({
+      id: `${file.name}-${file.lastModified}`,
+      file,
+      preview: URL.createObjectURL(file),
+      name: file.name,
+    }));
     setReferenceImages((prev) => [...prev, ...newImages].slice(0, 6));
   }, [referenceImages.length]);
 
@@ -81,624 +229,694 @@ export default function AddProjectClient() {
     });
   }, []);
 
-  const onSubmit = async (data: FormValues) => {
-    setIsSubmitting(true);
-    setSubmitError('');
-    try {
-      const { supabase } = await import('@/lib/supabase');
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from('projects').insert({
-        user_id: user?.id ?? null,
-        name: data.name,
-        email: data.email,
-        project_name: data.project_name,
-        project_type: selectedType || data.project_type,
-        description: data.description,
-        budget: selectedBudget || data.budget,
-        status: 'Draft',
-      });
-      if (error) throw error;
-      setIsSuccess(true);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
-      setSubmitError(message);
-    } finally {
-      setIsSubmitting(false);
-    }
+  /* ── Shared styles ────────────────────────────────────────────────── */
+  const inputStyle: React.CSSProperties = {
+    background: 'transparent',
+    border: 'none',
+    borderBottom: '1px solid rgba(255,255,255,0.13)',
+    outline: 'none',
+    color: '#ffffff',
+    width: '100%',
+    fontSize: '1.125rem',
+    fontWeight: 300,
+    letterSpacing: '0.01em',
+    padding: '14px 0',
+    fontFamily: 'inherit',
+    transition: 'border-color 0.3s ease',
+    borderRadius: 0,
+  };
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: '0.6875rem',
+    fontWeight: 600,
+    letterSpacing: '0.16em',
+    textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.28)',
+    marginBottom: '10px',
+  };
+
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    e.currentTarget.style.borderBottomColor = 'rgba(255,255,255,0.75)';
+  };
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    e.currentTarget.style.borderBottomColor = 'rgba(255,255,255,0.13)';
   };
 
   if (isSuccess) {
-    return <SuccessScreen onNew={() => { setIsSuccess(false); reset(); setSelectedType(''); setSelectedBudget(''); setReferenceImages([]); }} />;
+    return (
+      <div className="relative min-h-screen w-full overflow-hidden">
+        <BackgroundGlow />
+        <SiteHeader />
+        <main className="relative z-10 min-h-screen flex items-center justify-center px-6">
+          <SuccessState onStartNew={() => {
+            setIsSuccess(false);
+            setCurrentStep(1);
+            reset();
+            setSelectedType('');
+            setSelectedBudget('');
+            setReferenceImages([]);
+          }} />
+        </main>
+      </div>
+    );
   }
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@300;400&display=swap');
-
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        .ap-root {
-          min-height: 100vh;
-          background: #080608;
-          color: #EDE9E3;
-          font-family: 'DM Mono', monospace;
-          display: flex;
-          flex-direction: column;
+        /* Step progress pill */
+        .step-pill {
+          transition: all 0.5s cubic-bezier(0.34,1.56,0.64,1);
         }
 
-        .ap-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 28px 40px;
-          border-bottom: 1px solid rgba(201,169,110,0.1);
-        }
-        .ap-logo {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 1.1rem;
-          font-weight: 500;
-          letter-spacing: 0.08em;
-          color: #C9A96E;
-          text-decoration: none;
-        }
-        .ap-back {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 0.65rem;
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-          color: rgba(237,233,227,0.3);
-          text-decoration: none;
-          transition: color 0.3s;
-        }
-        .ap-back:hover { color: rgba(237,233,227,0.7); }
-
-        .ap-body {
-          flex: 1;
-          display: grid;
-          grid-template-columns: 1fr 1.6fr;
-          min-height: 0;
-        }
-
-        .ap-left {
-          padding: 60px 48px;
-          border-right: 1px solid rgba(201,169,110,0.1);
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          position: sticky;
-          top: 0;
-          height: calc(100vh - 73px);
-          overflow: hidden;
-        }
-        .ap-eyebrow {
-          font-size: 0.6rem;
-          letter-spacing: 0.22em;
-          text-transform: uppercase;
-          color: rgba(201,169,110,0.55);
-          margin-bottom: 32px;
-        }
-        .ap-title {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: clamp(2.8rem, 4vw, 4rem);
-          font-weight: 300;
-          line-height: 1.1;
-          letter-spacing: -0.02em;
-          color: #EDE9E3;
-          margin-bottom: 28px;
-        }
-        .ap-title em {
-          font-style: italic;
-          color: #C9A96E;
-        }
-        .ap-desc {
-          font-size: 0.72rem;
-          line-height: 2;
-          color: rgba(237,233,227,0.3);
-          letter-spacing: 0.04em;
-          max-width: 280px;
-        }
-        .ap-stats {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-        .ap-stat {
-          display: flex;
-          align-items: baseline;
-          gap: 12px;
-        }
-        .ap-stat-num {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 1.6rem;
-          font-weight: 300;
-          color: #C9A96E;
-          letter-spacing: -0.02em;
-        }
-        .ap-stat-label {
-          font-size: 0.6rem;
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-          color: rgba(237,233,227,0.25);
-        }
-        .ap-left-orb {
-          position: absolute;
-          bottom: -80px; left: -80px;
-          width: 320px; height: 320px;
-          border-radius: 50%;
-          background: radial-gradient(ellipse at center, rgba(201,169,110,0.07) 0%, transparent 65%);
-          pointer-events: none;
-        }
-
-        .ap-right {
-          padding: 60px 56px;
-          overflow-y: auto;
-        }
-
-        .ap-section-label {
-          font-size: 0.58rem;
-          letter-spacing: 0.24em;
-          text-transform: uppercase;
-          color: rgba(201,169,110,0.45);
-          margin-bottom: 24px;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .ap-section-label::before {
-          content: '';
-          display: block;
-          width: 20px; height: 1px;
-          background: rgba(201,169,110,0.35);
-        }
-
-        .ap-grid-2 {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 28px;
-          margin-bottom: 28px;
-        }
-        .ap-field {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          margin-bottom: 28px;
-        }
-        .ap-label {
-          font-size: 0.58rem;
-          letter-spacing: 0.2em;
-          text-transform: uppercase;
-          color: rgba(201,169,110,0.5);
-        }
-        .ap-input {
-          background: transparent;
-          border: none;
-          border-bottom: 1px solid rgba(237,233,227,0.1);
-          outline: none;
-          color: #EDE9E3;
-          font-size: 0.88rem;
-          font-family: 'DM Mono', monospace;
-          font-weight: 300;
-          letter-spacing: 0.02em;
-          padding: 12px 0;
-          width: 100%;
-          transition: border-color 0.3s;
-          border-radius: 0;
-        }
-        .ap-input:focus { border-bottom-color: rgba(201,169,110,0.6); }
-        .ap-input::placeholder { color: rgba(237,233,227,0.12); }
-        .ap-textarea {
-          background: rgba(237,233,227,0.02);
-          border: 1px solid rgba(237,233,227,0.08);
-          outline: none;
-          color: #EDE9E3;
-          font-size: 0.82rem;
-          font-family: 'DM Mono', monospace;
-          font-weight: 300;
-          letter-spacing: 0.02em;
-          padding: 18px 20px;
-          width: 100%;
-          resize: none;
-          border-radius: 4px;
-          min-height: 130px;
-          line-height: 1.9;
-          transition: border-color 0.3s;
-        }
-        .ap-textarea:focus { border-color: rgba(201,169,110,0.3); }
-        .ap-textarea::placeholder { color: rgba(237,233,227,0.1); }
-        .ap-error-msg { font-size: 0.6rem; color: #f87171; letter-spacing: 0.08em; }
-
-        .ap-pills {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-        }
-        .ap-pill {
-          padding: 7px 16px;
-          border-radius: 2px;
-          font-size: 0.62rem;
-          font-family: 'DM Mono', monospace;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
+        /* Pill chip selectors */
+        .type-chip {
+          padding: 9px 18px;
+          border-radius: 999px;
+          font-size: 0.8125rem;
+          font-weight: 400;
+          letter-spacing: 0.01em;
           cursor: pointer;
-          border: 1px solid rgba(237,233,227,0.08);
+          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(255,255,255,0.03);
+          color: rgba(255,255,255,0.45);
+          transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
+          font-family: inherit;
+          line-height: 1;
+        }
+        .type-chip:hover {
+          border-color: rgba(168,85,247,0.4);
+          color: rgba(168,85,247,0.9);
+          background: rgba(168,85,247,0.07);
+          transform: translateY(-1px);
+        }
+        .type-chip.active {
+          background: rgba(168,85,247,0.13);
+          border-color: rgba(168,85,247,0.55);
+          color: rgba(168,85,247,0.95);
+          box-shadow: 0 0 16px rgba(168,85,247,0.18);
+        }
+
+        .budget-chip {
+          padding: 9px 18px;
+          border-radius: 999px;
+          font-size: 0.8125rem;
+          font-weight: 400;
+          letter-spacing: 0.01em;
+          cursor: pointer;
+          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(255,255,255,0.03);
+          color: rgba(255,255,255,0.45);
+          transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
+          font-family: inherit;
+          line-height: 1;
+        }
+        .budget-chip:hover {
+          border-color: rgba(236,72,153,0.4);
+          color: rgba(236,72,153,0.9);
+          background: rgba(236,72,153,0.07);
+          transform: translateY(-1px);
+        }
+        .budget-chip.active {
+          background: rgba(236,72,153,0.11);
+          border-color: rgba(236,72,153,0.5);
+          color: rgba(236,72,153,0.95);
+          box-shadow: 0 0 16px rgba(236,72,153,0.15);
+        }
+
+        /* CTA buttons */
+        .btn-continue {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          padding: 14px 32px;
+          border-radius: 999px;
+          font-size: 0.8125rem;
+          font-weight: 600;
+          letter-spacing: 0.05em;
+          background: #ffffff;
+          color: #080808;
+          border: none;
+          cursor: pointer;
+          transition: all 0.25s ease;
+          box-shadow: 0 6px 28px rgba(255,255,255,0.12);
+          font-family: inherit;
+        }
+        .btn-continue:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 10px 36px rgba(255,255,255,0.18);
+        }
+        .btn-continue:active { transform: translateY(0); }
+
+        .btn-prev {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 14px 24px;
+          border-radius: 999px;
+          font-size: 0.8125rem;
+          font-weight: 400;
+          letter-spacing: 0.04em;
+          background: rgba(255,255,255,0.05);
+          color: rgba(255,255,255,0.45);
+          border: 1px solid rgba(255,255,255,0.1);
+          cursor: pointer;
+          transition: all 0.25s ease;
+          font-family: inherit;
+        }
+        .btn-prev:hover {
+          background: rgba(255,255,255,0.09);
+          color: rgba(255,255,255,0.75);
+          border-color: rgba(255,255,255,0.2);
+        }
+
+        .btn-submit {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          padding: 14px 32px;
+          border-radius: 999px;
+          font-size: 0.8125rem;
+          font-weight: 600;
+          letter-spacing: 0.05em;
+          background: #ffffff;
+          color: #080808;
+          border: none;
+          cursor: pointer;
+          transition: all 0.25s ease;
+          box-shadow: 0 6px 28px rgba(255,255,255,0.12);
+          font-family: inherit;
+        }
+        .btn-submit:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+          transform: none;
+        }
+        .btn-submit:not(:disabled):hover {
+          transform: translateY(-1px);
+          box-shadow: 0 10px 36px rgba(255,255,255,0.2);
+        }
+
+        /* Textarea */
+        .vision-textarea {
           background: transparent;
-          color: rgba(237,233,227,0.3);
-          transition: all 0.25s;
+          border: 1px solid rgba(255,255,255,0.1);
+          outline: none;
+          color: #ffffff;
+          width: 100%;
+          font-size: 1rem;
+          font-weight: 300;
+          letter-spacing: 0.01em;
+          padding: 18px;
+          font-family: inherit;
+          border-radius: 16px;
+          resize: none;
+          line-height: 1.8;
+          transition: border-color 0.3s ease;
         }
-        .ap-pill:hover { border-color: rgba(201,169,110,0.3); color: rgba(201,169,110,0.7); }
-        .ap-pill.selected { border-color: rgba(201,169,110,0.6); background: rgba(201,169,110,0.08); color: #C9A96E; }
+        .vision-textarea:focus { border-color: rgba(255,255,255,0.32); }
+        .vision-textarea::placeholder { color: rgba(255,255,255,0.15); }
 
-        .ap-divider {
-          height: 1px;
-          background: linear-gradient(90deg, rgba(201,169,110,0.15), transparent);
-          margin: 44px 0;
-        }
-
-        .ap-dropzone {
-          border: 1px dashed rgba(237,233,227,0.1);
-          border-radius: 4px;
+        /* Drop zone */
+        .drop-zone {
+          border: 1px dashed rgba(255,255,255,0.1);
+          border-radius: 18px;
           padding: 36px 24px;
           text-align: center;
           cursor: pointer;
-          transition: all 0.3s;
+          transition: all 0.3s ease;
         }
-        .ap-dropzone:hover, .ap-dropzone.dragging {
-          border-color: rgba(201,169,110,0.35);
-          background: rgba(201,169,110,0.03);
+        .drop-zone:hover, .drop-zone.drag-over {
+          border-color: rgba(168,85,247,0.45);
+          background: rgba(168,85,247,0.05);
         }
-        .ap-dropzone-icon {
-          width: 36px; height: 36px;
-          border-radius: 50%;
-          background: rgba(237,233,227,0.03);
-          border: 1px solid rgba(237,233,227,0.07);
-          display: flex; align-items: center; justify-content: center;
-          margin: 0 auto 12px;
-        }
-        .ap-dropzone-text { font-size: 0.65rem; letter-spacing: 0.1em; color: rgba(237,233,227,0.3); }
-        .ap-dropzone-sub { font-size: 0.58rem; letter-spacing: 0.08em; color: rgba(237,233,227,0.15); margin-top: 4px; }
-        .ap-image-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
-        .ap-image-thumb { position: relative; aspect-ratio: 4/3; border-radius: 4px; overflow: hidden; border: 1px solid rgba(237,233,227,0.07); }
-        .ap-image-thumb img { width: 100%; height: 100%; object-fit: cover; }
-        .ap-image-remove { position: absolute; inset: 0; background: rgba(0,0,0,0.65); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; }
-        .ap-image-thumb:hover .ap-image-remove { opacity: 1; }
-        .ap-remove-btn { width: 28px; height: 28px; border-radius: 50%; background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; }
 
-        .ap-submit-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-top: 48px;
-          padding-top: 36px;
-          border-top: 1px solid rgba(237,233,227,0.06);
+        /* Headline gradient */
+        .headline-gradient {
+          background: linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.75) 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
         }
-        .ap-submit-note { font-size: 0.58rem; letter-spacing: 0.1em; color: rgba(237,233,227,0.18); }
-        .ap-submit-btn {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 16px 36px;
-          background: #C9A96E;
-          color: #080608;
-          border: none;
-          border-radius: 2px;
-          font-family: 'DM Mono', monospace;
-          font-size: 0.62rem;
-          letter-spacing: 0.2em;
-          text-transform: uppercase;
-          cursor: pointer;
-          transition: all 0.3s;
-          position: relative;
-          overflow: hidden;
-        }
-        .ap-submit-btn:hover { background: #E8D4A0; transform: translateY(-1px); }
-        .ap-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-        .ap-submit-btn::after {
-          content: '';
-          position: absolute; top: 0; left: -100%;
-          width: 60%; height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-          transform: skewX(-20deg);
-          animation: ap-shimmer 3s ease-in-out infinite;
-        }
-        @keyframes ap-shimmer { 0% { left: -100%; } 100% { left: 200%; } }
 
-        .ap-error-box { background: rgba(248,113,113,0.06); border: 1px solid rgba(248,113,113,0.15); border-radius: 4px; padding: 14px 18px; font-size: 0.68rem; color: rgba(248,113,113,0.9); margin-top: 16px; }
-
-        @keyframes ap-fade-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        .ap-a  { animation: ap-fade-up 0.7s cubic-bezier(0.16,1,0.3,1) forwards; }
-        .ap-d1 { animation-delay: 0.1s; opacity: 0; }
-        .ap-d2 { animation-delay: 0.2s; opacity: 0; }
-        .ap-d3 { animation-delay: 0.3s; opacity: 0; }
-        .ap-d4 { animation-delay: 0.45s; opacity: 0; }
-        .ap-d5 { animation-delay: 0.6s; opacity: 0; }
-
-        @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-        @media (max-width: 860px) {
-          .ap-body { grid-template-columns: 1fr; }
-          .ap-left { position: static; height: auto; padding: 40px 28px; border-right: none; border-bottom: 1px solid rgba(201,169,110,0.1); }
-          .ap-left-orb { display: none; }
-          .ap-right { padding: 40px 28px; }
-          .ap-header { padding: 20px 28px; }
-          .ap-grid-2 { grid-template-columns: 1fr; }
-          .ap-submit-row { flex-direction: column; gap: 16px; align-items: flex-start; }
-          .ap-submit-btn { width: 100%; justify-content: center; }
-        }
+        /* Spin keyframe */
+        @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
       `}</style>
 
-      <div className="ap-root">
-        <header className="ap-header">
-          <Link href="/" className="ap-logo">MotionGrace</Link>
-          <Link href="/" className="ap-back">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
-            </svg>
-            Back to Studio
-          </Link>
-        </header>
+      <div className="relative min-h-screen w-full overflow-hidden" ref={containerRef}>
+        <BackgroundGlow />
+        <SiteHeader />
 
-        <div className="ap-body">
-          {/* Left Panel */}
-          <aside className="ap-left">
-            <div>
-              <p className="ap-eyebrow ap-a ap-d1">New Project Brief</p>
-              <h1 className="ap-title ap-a ap-d2">
-                Let&apos;s build<br />something<br /><em>extraordinary.</em>
-              </h1>
-              <p className="ap-desc ap-a ap-d3">
-                Share your vision and we&apos;ll transform it into motion that lasts forever. Fill out the brief and we&apos;ll respond within 24 hours.
-              </p>
+        {/* Step progress — top center */}
+        <div className="fixed top-7 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+          {STEPS.map((step) => (
+            <div
+              key={step.id}
+              className="step-pill flex items-center gap-1.5 overflow-hidden"
+              style={{
+                height: '26px',
+                borderRadius: '13px',
+                padding: currentStep === step.id ? '0 12px' : '0 6px',
+                width: currentStep === step.id ? 'auto' : '26px',
+                background: currentStep === step.id
+                  ? 'linear-gradient(135deg, rgba(168,85,247,0.25), rgba(236,72,153,0.2))'
+                  : currentStep > step.id
+                    ? 'rgba(168,85,247,0.18)'
+                    : 'rgba(255,255,255,0.07)',
+                border: currentStep === step.id
+                  ? '1px solid rgba(168,85,247,0.4)'
+                  : currentStep > step.id
+                    ? '1px solid rgba(168,85,247,0.25)'
+                    : '1px solid rgba(255,255,255,0.1)',
+              }}
+            >
+              <span style={{
+                width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
+                background: currentStep === step.id
+                  ? 'linear-gradient(135deg, #a855f7, #ec4899)'
+                  : currentStep > step.id
+                    ? 'rgba(168,85,247,0.6)'
+                    : 'rgba(255,255,255,0.2)',
+              }} />
+              {currentStep === step.id && (
+                <span style={{
+                  fontSize: '0.65rem',
+                  fontWeight: 600,
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  color: 'rgba(255,255,255,0.85)',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {step.label}
+                </span>
+              )}
             </div>
-            <div className="ap-a ap-d4">
-              <div className="ap-stats">
-                <div className="ap-stat">
-                  <span className="ap-stat-num">24h</span>
-                  <span className="ap-stat-label">Response time</span>
-                </div>
-                <div className="ap-stat">
-                  <span className="ap-stat-num">12k+</span>
-                  <span className="ap-stat-label">Assets delivered</span>
-                </div>
-                <div className="ap-stat">
-                  <span className="ap-stat-num">5d</span>
-                  <span className="ap-stat-label">Avg. turnaround</span>
-                </div>
-              </div>
-            </div>
-            <div className="ap-left-orb" />
-          </aside>
+          ))}
+        </div>
 
-          {/* Right Panel */}
-          <main className="ap-right">
-            <form onSubmit={handleSubmit(onSubmit)}>
+        <main className="relative z-10 min-h-screen flex items-center justify-center px-6 sm:px-10">
+          <div className="w-full max-w-lg">
 
-              {/* 01 — About You */}
-              <div className="ap-a ap-d2">
-                <p className="ap-section-label">01 &mdash; About You</p>
-                <div className="ap-grid-2">
-                  <div className="ap-field">
-                    <label className="ap-label">Full Name *</label>
-                    <input className="ap-input" placeholder="Your name" autoComplete="name"
-                      {...register('name', { required: 'Required', minLength: { value: 2, message: 'Min 2 chars' } })} />
-                    {errors.name && <span className="ap-error-msg">{errors.name.message}</span>}
-                  </div>
-                  <div className="ap-field">
-                    <label className="ap-label">Email Address *</label>
-                    <input className="ap-input" type="email" placeholder="you@company.com" autoComplete="email"
-                      {...register('email', { required: 'Required', pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Valid email required' } })} />
-                    {errors.email && <span className="ap-error-msg">{errors.email.message}</span>}
-                  </div>
-                </div>
-              </div>
-
-              <div className="ap-divider" />
-
-              {/* 02 — The Project */}
-              <div className="ap-a ap-d3">
-                <p className="ap-section-label">02 &mdash; The Project</p>
-                <div className="ap-field">
-                  <label className="ap-label">Project Name *</label>
-                  <input className="ap-input" placeholder="What are we calling this?" autoComplete="off"
-                    {...register('project_name', { required: 'Required', minLength: { value: 2, message: 'Min 2 chars' } })} />
-                  {errors.project_name && <span className="ap-error-msg">{errors.project_name.message}</span>}
-                </div>
-                <div className="ap-field">
-                  <label className="ap-label">Project Type</label>
-                  <div className="ap-pills">
-                    {PROJECT_TYPES.map((type) => (
-                      <button key={type} type="button"
-                        onClick={() => setSelectedType(type === selectedType ? '' : type)}
-                        className={`ap-pill${selectedType === type ? ' selected' : ''}`}>
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="ap-field" style={{ marginTop: 28 }}>
-                  <label className="ap-label">Budget Range</label>
-                  <div className="ap-pills">
-                    {BUDGET_RANGES.map((range) => (
-                      <button key={range} type="button"
-                        onClick={() => setSelectedBudget(range === selectedBudget ? '' : range)}
-                        className={`ap-pill${selectedBudget === range ? ' selected' : ''}`}>
-                        {range}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="ap-divider" />
-
-              {/* 03 — Vision */}
-              <div className="ap-a ap-d4">
-                <p className="ap-section-label">03 &mdash; Your Vision</p>
-                <div className="ap-field">
-                  <label className="ap-label">Project Brief *</label>
-                  <textarea className="ap-textarea" rows={6}
-                    placeholder="Describe your vision, creative direction, timeline, and any inspiration..."
-                    {...register('description', { required: 'Please describe your project', minLength: { value: 20, message: 'At least 20 characters' } })} />
-                  {errors.description && <span className="ap-error-msg">{errors.description.message}</span>}
-                </div>
-              </div>
-
-              <div className="ap-divider" />
-
-              {/* 04 — References */}
-              <div className="ap-a ap-d5">
-                <p className="ap-section-label">
-                  04 &mdash; Visual References&nbsp;
-                  <span style={{ color: 'rgba(237,233,227,0.18)', fontSize: '0.55rem', letterSpacing: '0.12em' }}>Optional</span>
+            {/* ── Step 1: Name + Project Name ──────────────── */}
+            <div
+              ref={(el) => { stepRefs.current[0] = el; }}
+              style={{ display: currentStep === 1 ? 'block' : 'none', opacity: 1 }}
+            >
+              <StepCounter step={1} total={4} />
+              <div data-animate>
+                <h2 style={{
+                  fontSize: 'clamp(2.5rem, 7vw, 4rem)',
+                  fontWeight: 800,
+                  lineHeight: 1.0,
+                  letterSpacing: '-0.035em',
+                  color: '#ffffff',
+                  marginBottom: '12px',
+                }}>
+                  Let&apos;s start<br />
+                  <span style={{
+                    background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}>with you.</span>
+                </h2>
+                <p style={{ fontSize: '0.875rem', fontWeight: 300, color: 'rgba(255,255,255,0.32)', marginBottom: '44px', letterSpacing: '0.01em', lineHeight: 1.7 }}>
+                  Tell us who you are and what you&apos;re building.
                 </p>
-                <div
-                  className={`ap-dropzone${isDragging ? ' dragging' : ''}`}
-                  onClick={() => fileInputRef.current?.click()}
-                  onDrop={(e) => { e.preventDefault(); setIsDragging(false); addImages(e.dataTransfer.files); }}
-                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                  onDragLeave={() => setIsDragging(false)}
-                  role="button" tabIndex={0} aria-label="Upload reference images"
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
-                >
-                  <div className="ap-dropzone-icon">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(237,233,227,0.35)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                      <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                    </svg>
-                  </div>
-                  <p className="ap-dropzone-text">{isDragging ? 'Drop to upload' : 'Drag & drop or click to browse'}</p>
-                  <p className="ap-dropzone-sub">PNG, JPG, WEBP — up to 6 images</p>
-                  <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
-                    onChange={(e) => { if (e.target.files) addImages(e.target.files); e.target.value = ''; }} />
+              </div>
+
+              <div className="space-y-8">
+                <div data-animate>
+                  <label style={labelStyle}>Full Name</label>
+                  <input
+                    type="text"
+                    placeholder="Your name"
+                    autoComplete="name"
+                    autoFocus
+                    style={inputStyle}
+                    {...register('name', {
+                      required: 'Your name is required',
+                      minLength: { value: 2, message: 'Name must be at least 2 characters' },
+                    })}
+                    onFocus={handleFocus}
+                    onBlur={handleBlur}
+                  />
+                  {errors.name && <p style={{ fontSize: '0.7rem', marginTop: '6px', color: '#f87171' }}>{errors.name.message}</p>}
                 </div>
-                {referenceImages.length > 0 && (
-                  <div className="ap-image-grid">
-                    {referenceImages.map((img) => (
-                      <div key={img.id} className="ap-image-thumb">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={img.preview} alt={img.name} />
-                        <div className="ap-image-remove">
-                          <button type="button" className="ap-remove-btn"
-                            onClick={(e) => { e.stopPropagation(); removeImage(img.id); }}
-                            aria-label={`Remove ${img.name}`}>
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
+
+                <div data-animate>
+                  <label style={labelStyle}>Project Name</label>
+                  <input
+                    type="text"
+                    placeholder="What&apos;s this project called?"
+                    autoComplete="off"
+                    style={inputStyle}
+                    {...register('project_name', {
+                      required: 'Project name is required',
+                      minLength: { value: 2, message: 'Project name must be at least 2 characters' },
+                    })}
+                    onFocus={handleFocus}
+                    onBlur={handleBlur}
+                  />
+                  {errors.project_name && <p style={{ fontSize: '0.7rem', marginTop: '6px', color: '#f87171' }}>{errors.project_name.message}</p>}
+                </div>
+
+                <div data-animate className="pt-2">
+                  <button className="btn-continue" onClick={handleStep1Next} type="button">
+                    Continue
+                    <ArrowRight />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Step 2: Project Type + Budget ────────────── */}
+            <div
+              ref={(el) => { stepRefs.current[1] = el; }}
+              style={{ display: currentStep === 2 ? 'block' : 'none', opacity: 1 }}
+            >
+              <StepCounter step={2} total={4} />
+              <div data-animate>
+                <h2 style={{
+                  fontSize: 'clamp(2.5rem, 7vw, 4rem)',
+                  fontWeight: 800,
+                  lineHeight: 1.0,
+                  letterSpacing: '-0.035em',
+                  color: '#ffffff',
+                  marginBottom: '12px',
+                }}>
+                  What are we<br />
+                  <span style={{
+                    background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}>creating?</span>
+                </h2>
+                <p style={{ fontSize: '0.875rem', fontWeight: 300, color: 'rgba(255,255,255,0.32)', marginBottom: '44px', letterSpacing: '0.01em', lineHeight: 1.7 }}>
+                  Choose the type of work and your budget range.
+                </p>
+              </div>
+
+              <div className="space-y-10">
+                <div data-animate>
+                  <label style={labelStyle}>Project Type</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                    {PROJECT_TYPES.map((type) => (
+                      <button
+                        key={type.value}
+                        type="button"
+                        onClick={() => setSelectedType(type.value === selectedType ? '' : type.value)}
+                        className={`type-chip${selectedType === type.value ? ' active' : ''}`}
+                      >
+                        {type.label}
+                      </button>
                     ))}
+                  </div>
+                </div>
+
+                <div data-animate>
+                  <label style={labelStyle}>Budget Range</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                    {BUDGET_RANGES.map((range) => (
+                      <button
+                        key={range.value}
+                        type="button"
+                        onClick={() => setSelectedBudget(range.value === selectedBudget ? '' : range.value)}
+                        className={`budget-chip${selectedBudget === range.value ? ' active' : ''}`}
+                      >
+                        {range.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div data-animate className="pt-1">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <button className="btn-prev" type="button" onClick={() => handlePrev(1)}>
+                      <ArrowLeft /> Previous
+                    </button>
+                    <button className="btn-continue" type="button" onClick={handleStep2Next}>
+                      Continue <ArrowRight />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Step 3: Vision / Description ─────────────── */}
+            <div
+              ref={(el) => { stepRefs.current[2] = el; }}
+              style={{ display: currentStep === 3 ? 'block' : 'none', opacity: 1 }}
+            >
+              <StepCounter step={3} total={4} />
+              <div data-animate>
+                <h2 style={{
+                  fontSize: 'clamp(2.5rem, 7vw, 4rem)',
+                  fontWeight: 800,
+                  lineHeight: 1.0,
+                  letterSpacing: '-0.035em',
+                  color: '#ffffff',
+                  marginBottom: '12px',
+                }}>
+                  Describe your<br />
+                  <span style={{
+                    background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}>vision.</span>
+                </h2>
+                <p style={{ fontSize: '0.875rem', fontWeight: 300, color: 'rgba(255,255,255,0.32)', marginBottom: '44px', letterSpacing: '0.01em', lineHeight: 1.7 }}>
+                  Share your creative direction, timeline, and what inspires you.
+                </p>
+              </div>
+
+              <div className="space-y-8">
+                <div data-animate>
+                  <label style={labelStyle}>Project Vision</label>
+                  <textarea
+                    rows={6}
+                    placeholder="Describe your vision, creative direction, timeline, and any references that inspire you..."
+                    className="vision-textarea"
+                    {...register('description', {
+                      required: 'Please describe your project',
+                      minLength: { value: 20, message: 'Please provide at least 20 characters' },
+                    })}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.32)'; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
+                  />
+                  {errors.description && <p style={{ fontSize: '0.7rem', marginTop: '6px', color: '#f87171' }}>{errors.description.message}</p>}
+                </div>
+
+                <div data-animate className="pt-1">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <button className="btn-prev" type="button" onClick={() => handlePrev(2)}>
+                      <ArrowLeft /> Previous
+                    </button>
+                    <button className="btn-continue" type="button" onClick={handleStep3Next}>
+                      Continue <ArrowRight />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Step 4: Reference Images + Submit ────────── */}
+            <div
+              ref={(el) => { stepRefs.current[3] = el; }}
+              style={{ display: currentStep === 4 ? 'block' : 'none', opacity: 1 }}
+            >
+              <StepCounter step={4} total={4} />
+              <div data-animate>
+                <h2 style={{
+                  fontSize: 'clamp(2.5rem, 7vw, 4rem)',
+                  fontWeight: 800,
+                  lineHeight: 1.0,
+                  letterSpacing: '-0.035em',
+                  color: '#ffffff',
+                  marginBottom: '12px',
+                }}>
+                  Any visual<br />
+                  <span style={{
+                    background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}>references?</span>
+                </h2>
+                <p style={{ fontSize: '0.875rem', fontWeight: 300, color: 'rgba(255,255,255,0.32)', marginBottom: '36px', letterSpacing: '0.01em', lineHeight: 1.7 }}>
+                  Optional — share images that inspire your project aesthetic.
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                <div data-animate>
+                  {/* Drop zone */}
+                  <div
+                    className={`drop-zone${isDragging ? ' drag-over' : ''}`}
+                    onClick={() => fileInputRef.current?.click()}
+                    onDrop={(e) => { e.preventDefault(); setIsDragging(false); addImages(e.dataTransfer.files); }}
+                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Upload reference images"
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
+                  >
+                    <div style={{
+                      width: '44px', height: '44px', borderRadius: '50%', margin: '0 auto 14px',
+                      background: isDragging ? 'rgba(168,85,247,0.12)' : 'rgba(255,255,255,0.04)',
+                      border: isDragging ? '1px solid rgba(168,85,247,0.35)' : '1px solid rgba(255,255,255,0.08)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all 0.3s ease',
+                    }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                        stroke={isDragging ? 'rgba(168,85,247,0.9)' : 'rgba(255,255,255,0.4)'}
+                        strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                      </svg>
+                    </div>
+                    <p style={{ fontSize: '0.8125rem', fontWeight: 300, color: isDragging ? 'rgba(168,85,247,0.9)' : 'rgba(255,255,255,0.4)', marginBottom: '4px' }}>
+                      {isDragging ? 'Drop to upload' : 'Drag & drop or click to browse'}
+                    </p>
+                    <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.2)', letterSpacing: '0.03em' }}>
+                      PNG, JPG, WEBP — up to 6 images
+                    </p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      style={{ display: 'none' }}
+                      onChange={(e) => { if (e.target.files) addImages(e.target.files); e.target.value = ''; }}
+                    />
+                  </div>
+
+                  {/* Image previews */}
+                  {referenceImages.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '10px' }}>
+                      {referenceImages.map((img) => (
+                        <div
+                          key={img.id}
+                          style={{
+                            position: 'relative', aspectRatio: '4/3', borderRadius: '12px',
+                            overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)',
+                          }}
+                          className="group"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={img.preview} alt={`Reference: ${img.name}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <div style={{
+                            position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            opacity: 0, transition: 'opacity 0.2s',
+                          }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.opacity = '1'; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.opacity = '0'; }}
+                          >
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); removeImage(img.id); }}
+                              style={{
+                                width: '28px', height: '28px', borderRadius: '50%',
+                                background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.3)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                              }}
+                              aria-label={`Remove ${img.name}`}
+                            >
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Error */}
+                {submitError && (
+                  <div data-animate style={{
+                    display: 'flex', padding: '14px 16px', borderRadius: '14px',
+                    background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.15)',
+                  }} role="alert">
+                    <p style={{ fontSize: '0.8125rem', fontWeight: 300, color: 'rgba(248,113,113,0.9)' }}>{submitError}</p>
                   </div>
                 )}
-              </div>
 
-              {submitError && <div className="ap-error-box">{submitError}</div>}
-
-              <div className="ap-submit-row">
-                <p className="ap-submit-note">We typically respond within 24 hours · No spam, ever</p>
-                <button type="submit" className="ap-submit-btn" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin-slow 1s linear infinite' }}>
-                        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-                      </svg>
-                      Submitting...
-                    </>
-                  ) : (
-                    <>
-                      Submit Brief
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-                      </svg>
-                    </>
-                  )}
-                </button>
+                {/* Submit */}
+                <div data-animate className="pt-1">
+                  <form onSubmit={handleSubmit(onSubmit)}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <button className="btn-prev" type="button" onClick={() => handlePrev(3)}>
+                        <ArrowLeft /> Previous
+                      </button>
+                      <button className="btn-submit" type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? (
+                          <>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
+                              <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                            </svg>
+                            Submitting...
+                          </>
+                        ) : (
+                          <>Submit Brief <ArrowRight /></>
+                        )}
+                      </button>
+                    </div>
+                    <p style={{ marginTop: '16px', fontSize: '0.7rem', fontWeight: 300, color: 'rgba(255,255,255,0.18)', letterSpacing: '0.04em' }}>
+                      We typically respond within 24 hours
+                    </p>
+                  </form>
+                </div>
               </div>
-            </form>
-          </main>
-        </div>
+            </div>
+
+          </div>
+        </main>
       </div>
     </>
   );
 }
 
-function SuccessScreen({ onNew }: { onNew: () => void }) {
+/* ── Small helpers ─────────────────────────────────────────────── */
+
+function StepCounter({ step, total }: { step: number; total: number }) {
   return (
-    <>
-      <style>{`
-        .ap-success-root {
-          min-height: 100vh;
-          background: #080608;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          font-family: 'DM Mono', monospace;
-          padding: 40px 24px;
-          text-align: center;
-        }
-        .ap-success-icon {
-          width: 72px; height: 72px;
-          border-radius: 50%;
-          background: rgba(201,169,110,0.07);
-          border: 1px solid rgba(201,169,110,0.2);
-          display: flex; align-items: center; justify-content: center;
-          margin: 0 auto 32px;
-          animation: ap-breathe 4s ease-in-out infinite;
-        }
-        @keyframes ap-breathe { 0%,100%{box-shadow:0 0 0 0 rgba(201,169,110,0)} 50%{box-shadow:0 0 40px 8px rgba(201,169,110,0.1)} }
-        .ap-success-title {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: clamp(2rem, 5vw, 3rem);
-          font-weight: 300;
-          color: #EDE9E3;
-          margin-bottom: 16px;
-          letter-spacing: -0.02em;
-        }
-        .ap-success-line { width: 40px; height: 1px; background: linear-gradient(90deg, #C9A96E, #E8D4A0); margin: 0 auto 20px; }
-        .ap-success-desc { font-size: 0.72rem; line-height: 2; color: rgba(237,233,227,0.3); max-width: 320px; margin: 0 auto 48px; letter-spacing: 0.04em; }
-        .ap-success-steps { display: flex; gap: 32px; margin-bottom: 48px; justify-content: center; }
-        .ap-success-step { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-        .ap-success-step-num { width: 32px; height: 32px; border-radius: 50%; background: rgba(201,169,110,0.08); border: 1px solid rgba(201,169,110,0.2); display: flex; align-items: center; justify-content: center; font-size: 0.58rem; color: rgba(201,169,110,0.7); letter-spacing: 0.08em; }
-        .ap-success-step-label { font-size: 0.6rem; color: rgba(237,233,227,0.4); letter-spacing: 0.1em; }
-        .ap-success-step-sub { font-size: 0.55rem; color: rgba(237,233,227,0.2); letter-spacing: 0.08em; }
-        .ap-success-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
-        .ap-success-btn-p { padding: 14px 32px; background: #C9A96E; color: #080608; border: none; border-radius: 2px; font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase; cursor: pointer; transition: background 0.3s; }
-        .ap-success-btn-p:hover { background: #E8D4A0; }
-        .ap-success-btn-s { padding: 14px 32px; background: transparent; color: rgba(237,233,227,0.4); border: 1px solid rgba(237,233,227,0.1); border-radius: 2px; font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase; text-decoration: none; transition: all 0.3s; display: inline-flex; align-items: center; }
-        .ap-success-btn-s:hover { border-color: rgba(237,233,227,0.25); color: rgba(237,233,227,0.7); }
-      `}</style>
-      <div className="ap-success-root">
-        <div className="ap-success-icon">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#C9A96E" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-        </div>
-        <h2 className="ap-success-title">Brief received.</h2>
-        <div className="ap-success-line" />
-        <p className="ap-success-desc">
-          Your project brief has been submitted to the Motion Grace studio. Expect a response within 24 hours.
-        </p>
-        <div className="ap-success-steps">
-          {[
-            { n: '01', label: 'Brief Review', sub: 'Within 24h' },
-            { n: '02', label: 'Discovery Call', sub: 'Day 2–3' },
-            { n: '03', label: 'Proposal', sub: 'Day 5–7' },
-          ].map((s) => (
-            <div key={s.n} className="ap-success-step">
-              <div className="ap-success-step-num">{s.n}</div>
-              <span className="ap-success-step-label">{s.label}</span>
-              <span className="ap-success-step-sub">{s.sub}</span>
-            </div>
-          ))}
-        </div>
-        <div className="ap-success-actions">
-          <button onClick={onNew} className="ap-success-btn-p">New Project</button>
-          <a href="/" className="ap-success-btn-s">Back to Studio</a>
-        </div>
-      </div>
-    </>
+    <div data-animate style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '28px' }}>
+      <div style={{
+        width: '28px', height: '1px',
+        background: 'linear-gradient(90deg, transparent, rgba(168,85,247,0.6))',
+      }} />
+      <span style={{
+        fontSize: '0.65rem',
+        fontWeight: 700,
+        letterSpacing: '0.22em',
+        textTransform: 'uppercase',
+        color: 'rgba(168,85,247,0.65)',
+      }}>
+        {String(step).padStart(2, '0')} / {String(total).padStart(2, '0')}
+      </span>
+    </div>
+  );
+}
+
+function ArrowRight() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+    </svg>
+  );
+}
+
+function ArrowLeft() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+    </svg>
   );
 }
