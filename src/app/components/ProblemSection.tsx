@@ -26,19 +26,36 @@ const painPoints = [
   { label: 'Final asset count', value: '≈20 images', color: '#ffa94d' },
 ];
 
-/* Screen 2 — three-line reveal structure */
 const revealLines = [
+  { words: ['There', 'is', 'a'], type: 'plain' as const },
+  { words: ['Better', 'Way.'], type: 'highlight' as const },
+  { words: ['Try', 'MotionGrace.'], type: 'brand' as const },
+];
+
+const STORY_BEATS = [
   {
-    words: ['There', 'is', 'a'],
-    type: 'plain' as const,
+    eyebrow: 'Our Role',
+    headline: 'The invisible\nCGI powerhouse.',
+    body: 'We act as the invisible CGI powerhouse behind leading creative agencies and modern brands — taking the friction out of high-end production, transforming conceptual ideas into stunning visual experiences.',
+    accent: '#C9A96E',
   },
   {
-    words: ['Better', 'Way.'],
-    type: 'highlight' as const,
+    eyebrow: 'What We Craft',
+    headline: 'Every frame,\nengineered.',
+    body: 'By crafting high-fidelity CGI product animations and design-driven narratives, we deliver scalable assets that transcend the limits of traditional photography. Cinematic storytelling fused with absolute product-focused precision.',
+    accent: '#8B7FD4',
   },
   {
-    words: ['Try', 'MotionGrace.'],
-    type: 'brand' as const,
+    eyebrow: 'Why It Matters',
+    headline: 'Motion.\nEmotion.\nInteractivity.',
+    body: 'Today\'s brands need more than visuals. Our CGI and 3D solutions allow products to be seen, felt, and explored from every angle — directly driving stronger engagement and measurable sales impact.',
+    accent: '#4A9EFF',
+  },
+  {
+    eyebrow: 'Our Promise',
+    headline: 'Imagination\nmade precise.',
+    body: 'From luxurious product commercials to immersive interactive CGI, Motion Grace merges artistic vision with cutting-edge technology — ensuring modern brands stand out in a crowded market.',
+    accent: '#C9A96E',
   },
 ];
 
@@ -62,29 +79,48 @@ const ACCENTS = ['#C9A96E', '#8B7FD4', '#4A9EFF'];
 function easeOutExpo(t: number): number {
   return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
 }
-function easeInOutSine(t: number): number {
-  return -(Math.cos(Math.PI * t) - 1) / 2;
-}
+
+/*
+ * Architecture:
+ *
+ * Screen 1  — normal flow, min-height 100vh
+ *
+ * Combined  — ONE tall section = 340vh (s2) + 880vh (s3) = 1220vh
+ *   Inside it, two sticky divs stacked at the same viewport position:
+ *     • Screen 2 sticky  z-index:1  fades OUT when arrowRaw ≥ 0.99
+ *     • Screen 3 sticky  z-index:2  fades IN  simultaneously
+ *   The second sticky uses marginTop: -100vh to sit exactly on top.
+ *   Both are driven by a single scroll calculation over the full 1220vh.
+ */
+const SCREEN2_VH  = 340;
+const STORY_VH    = STORY_BEATS.length * 220; // 880
+const TOTAL_VH    = SCREEN2_VH + STORY_VH;   // 1220
+const S2_FRAC     = SCREEN2_VH / TOTAL_VH;
+const S3_FRAC     = STORY_VH   / TOTAL_VH;
 
 export default function ProblemSection() {
   const screen1Ref   = useRef<HTMLElement>(null);
-  const screen2Ref   = useRef<HTMLElement>(null);
+  const combinedRef  = useRef<HTMLElement>(null);
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const mouseRef     = useRef({ x: 0.5, y: 0.5 });
   const rafRef       = useRef<number>(0);
+  const glowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [visibleLines, setVisibleLines]   = useState<boolean[]>(new Array(problemWords.length).fill(false));
-  const [distortLevel, setDistortLevel]   = useState(0);
+  /* Screen 1 */
+  const [visibleLines, setVisibleLines] = useState<boolean[]>(new Array(problemWords.length).fill(false));
+  const [distortLevel, setDistortLevel] = useState(0);
+
+  /* Screen 2 */
   const [wordProgress, setWordProgress]   = useState(0);
   const [glowPulse, setGlowPulse]         = useState(false);
   const [arrowFill, setArrowFill]         = useState(0);
   const [arrowDone, setArrowDone]         = useState(false);
   const [transitionOut, setTransitionOut] = useState(false);
 
-  // Track previous raw scroll value to detect direction and reset state
-  const glowTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /* Screen 3 */
+  const [storyProgress, setStoryProgress] = useState(0);
 
-  /* mouse */
+  /* Mouse */
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       mouseRef.current = { x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight };
@@ -93,141 +129,104 @@ export default function ProblemSection() {
     return () => window.removeEventListener('mousemove', onMove);
   }, []);
 
-  /* canvas */
+  /* Canvas */
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
     let w = 0, h = 0;
-    const resize = () => {
-      w = canvas.width  = canvas.offsetWidth;
-      h = canvas.height = canvas.offsetHeight;
-    };
+    const resize = () => { w = canvas.width = canvas.offsetWidth; h = canvas.height = canvas.offsetHeight; };
     resize();
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
 
     const drawCube = (cx: number, cy: number, size: number, rotX: number, rotY: number, opacity: number, accent: string) => {
       const s = size / 2;
-      const rxi = rotX * Math.PI / 180;
-      const ryi = rotY * Math.PI / 180;
+      const rxi = rotX * Math.PI / 180, ryi = rotY * Math.PI / 180;
       const cos = Math.cos, sin = Math.sin;
-
       const project = (px: number, py: number, pz: number): [number, number] => {
         const x1 = px * cos(ryi) + pz * sin(ryi);
         const z1 = -px * sin(ryi) + pz * cos(ryi);
         const y2 = py * cos(rxi) - z1 * sin(rxi);
         const z2 = py * sin(rxi) + z1 * cos(rxi);
-        const fov = 500;
-        const sc = fov / (fov + z2 + 200);
+        const sc = 500 / (500 + z2 + 200);
         return [cx + x1 * sc, cy + y2 * sc];
       };
-
-      const v: [number,number,number][] = [
-        [-s,-s,-s],[s,-s,-s],[s,s,-s],[-s,s,-s],
-        [-s,-s, s],[s,-s, s],[s,s, s],[-s,s, s],
-      ];
+      const v: [number,number,number][] = [[-s,-s,-s],[s,-s,-s],[s,s,-s],[-s,s,-s],[-s,-s,s],[s,-s,s],[s,s,s],[-s,s,s]];
       const faces = [[0,1,2,3],[4,5,6,7],[0,1,5,4],[2,3,7,6],[0,3,7,4],[1,2,6,5]];
       const brightness = [0.55, 1.0, 0.65, 0.45, 0.75, 0.38];
-
       faces.forEach((face, fi) => {
         const pts = face.map(vi => project(...v[vi]));
-        ctx.beginPath();
-        ctx.moveTo(pts[0][0], pts[0][1]);
+        ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
         for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
         ctx.closePath();
-
         const a0 = Math.round(opacity * brightness[fi] * 0.55 * 255).toString(16).padStart(2,'0');
         const a1 = Math.round(opacity * brightness[fi] * 0.12 * 255).toString(16).padStart(2,'0');
         const grd = ctx.createLinearGradient(pts[0][0], pts[0][1], pts[2][0], pts[2][1]);
-        grd.addColorStop(0, `${accent}${a0}`);
-        grd.addColorStop(1, `${accent}${a1}`);
-        ctx.fillStyle = grd;
-        ctx.fill();
-
-        const as = Math.round(opacity * 0.5 * 255).toString(16).padStart(2,'0');
-        ctx.strokeStyle = `${accent}${as}`;
-        ctx.lineWidth = 0.7;
-        ctx.stroke();
+        grd.addColorStop(0, `${accent}${a0}`); grd.addColorStop(1, `${accent}${a1}`);
+        ctx.fillStyle = grd; ctx.fill();
+        ctx.strokeStyle = `${accent}${Math.round(opacity * 0.5 * 255).toString(16).padStart(2,'0')}`;
+        ctx.lineWidth = 0.7; ctx.stroke();
       });
     };
 
     const animate = (ts: number) => {
       ctx.clearRect(0, 0, w, h);
-      const mx = mouseRef.current.x;
-      const my = mouseRef.current.y;
-
+      const mx = mouseRef.current.x, my = mouseRef.current.y;
       SHAPES.forEach((shape, i) => {
-        const t  = ts / 1000;
-        const dFar  = shape.depth === 'far';
-        const dMid  = shape.depth === 'mid';
-        const mx2 = dFar ? 8 : dMid ? 20 : 40;
-        const my2 = dFar ? 6 : dMid ? 15 : 30;
+        const t = ts / 1000, dFar = shape.depth === 'far', dMid = shape.depth === 'mid';
+        const mx2 = dFar ? 8 : dMid ? 20 : 40, my2 = dFar ? 6 : dMid ? 15 : 30;
         const px = (shape.x / 100) * w + Math.sin(t / shape.speed + i) * 30 + (mx - 0.5) * mx2;
         const py = (shape.y / 100) * h + Math.cos(t / shape.speed + i * 1.3) * 20 + (my - 0.5) * my2;
         const rotX = shape.rotX + Math.sin(t / (shape.speed * 0.8) + i) * 15 + (my - 0.5) * 25;
         const rotY = shape.rotY + Math.cos(t / (shape.speed * 0.9) + i * 0.7) * 20 + (mx - 0.5) * 30;
         drawCube(px, py, shape.size, rotX, rotY, shape.opacity, ACCENTS[shape.color]);
       });
-
       rafRef.current = requestAnimationFrame(animate);
     };
     rafRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      cancelAnimationFrame(rafRef.current);
-      ro.disconnect();
-    };
+    return () => { cancelAnimationFrame(rafRef.current); ro.disconnect(); };
   }, []);
 
-  /* scroll — fully bidirectional, all state derived from position */
+  /* Unified scroll handler */
   const handleScroll = useCallback(() => {
     if (screen1Ref.current) {
       const rect = screen1Ref.current.getBoundingClientRect();
-      const vh   = window.innerHeight;
-      const prog = Math.max(0, Math.min(1, 1 - rect.top / vh));
+      const prog = Math.max(0, Math.min(1, 1 - rect.top / window.innerHeight));
       setVisibleLines(problemWords.map((_, i) => prog > (i / problemWords.length) * 0.7));
       setDistortLevel(Math.min(prog * 1.5, 1));
     }
 
-    if (screen2Ref.current) {
-      const rect     = screen2Ref.current.getBoundingClientRect();
+    if (combinedRef.current) {
+      const rect     = combinedRef.current.getBoundingClientRect();
       const vh       = window.innerHeight;
-      const total    = screen2Ref.current.offsetHeight - vh;
+      const total    = combinedRef.current.offsetHeight - vh;
       const scrolled = -rect.top;
       const raw      = Math.max(0, Math.min(1, total > 0 ? scrolled / total : 0));
 
-      // word reveal: first half of scroll range
-      const wp = Math.max(0, Math.min(1, raw * 2));
+      /* ── Screen 2: raw 0 → S2_FRAC ── */
+      const s2Raw  = Math.max(0, Math.min(1, raw / S2_FRAC));
+      const wp     = Math.max(0, Math.min(1, s2Raw * 2));
       setWordProgress(wp);
 
-      // glow pulse: reactive to position, debounced on entry only
       if (wp > 0.92) {
-        if (glowTimerRef.current === null) {
+        if (glowTimerRef.current === null)
           glowTimerRef.current = setTimeout(() => setGlowPulse(true), 400);
-        }
       } else {
-        if (glowTimerRef.current !== null) {
-          clearTimeout(glowTimerRef.current);
-          glowTimerRef.current = null;
-        }
+        if (glowTimerRef.current !== null) { clearTimeout(glowTimerRef.current); glowTimerRef.current = null; }
         setGlowPulse(false);
       }
 
-      // arrow fill: second half of scroll range
-      const arrowRaw = Math.max(0, Math.min(1, (raw - 0.5) * 2));
+      const arrowRaw = Math.max(0, Math.min(1, (s2Raw - 0.5) * 2));
       setArrowFill(arrowRaw);
 
-      // transition: set on completion, reset with hysteresis on backward scroll
-      if (arrowRaw >= 0.99) {
-        setArrowDone(true);
-        setTransitionOut(true);
-      } else if (arrowRaw < 0.92) {
-        setArrowDone(false);
-        setTransitionOut(false);
-      }
+      if (arrowRaw >= 0.99) { setArrowDone(true); setTransitionOut(true); }
+      else if (arrowRaw < 0.92) { setArrowDone(false); setTransitionOut(false); }
+
+      /* ── Screen 3: raw S2_FRAC → 1 ── */
+      const s3Raw = Math.max(0, Math.min(1, (raw - S2_FRAC) / S3_FRAC));
+      setStoryProgress(s3Raw);
     }
   }, []);
 
@@ -240,15 +239,18 @@ export default function ProblemSection() {
     };
   }, [handleScroll]);
 
-  /* word-level progress per line/word */
-  const TOTAL_WORDS = revealLines.reduce((s, l) => s + l.words.length, 0);
-  let wordIdx = 0;
-  const wordEntries: { lineIdx: number; wordIdx: number; globalIdx: number; word: string; type: 'plain' | 'highlight' | 'brand' }[] = [];
-  revealLines.forEach((line, li) => {
-    line.words.forEach((word, wi) => {
-      wordEntries.push({ lineIdx: li, wordIdx: wi, globalIdx: wordIdx++, word, type: line.type });
-    });
-  });
+  /* Screen 3 derived */
+  const BEAT_COUNT = STORY_BEATS.length;
+  const BEAT_SLICE = 1 / BEAT_COUNT;
+  const activeBeat = Math.min(BEAT_COUNT - 1, Math.floor(storyProgress / BEAT_SLICE));
+  const localRaw   = Math.max(0, Math.min(1, (storyProgress - activeBeat * BEAT_SLICE) / BEAT_SLICE));
+  const localP     = easeOutExpo(localRaw);
+  const prevBeat   = activeBeat - 1;
+  const beat       = STORY_BEATS[activeBeat];
+  const prev       = prevBeat >= 0 ? STORY_BEATS[prevBeat] : null;
+  const headlineLines     = beat.headline.split('\n');
+  const prevHeadlineLines = prev ? prev.headline.split('\n') : [];
+  const counterProgress   = (activeBeat + localP) / BEAT_COUNT;
 
   return (
     <>
@@ -261,10 +263,8 @@ export default function ProblemSection() {
         <div className="absolute inset-0 pointer-events-none" style={{
           opacity: 0.04 + distortLevel * 0.03,
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-          backgroundSize: '150px 150px',
-          animation: 'noise-shift 0.5s steps(3) infinite',
+          backgroundSize: '150px 150px', animation: 'noise-shift 0.5s steps(3) infinite',
         }} />
-
         <div className="relative z-10 w-full py-20" style={{ maxWidth: '96vw', margin: '0 auto' }}>
           <div className="mb-8 flex items-center gap-3" style={{
             opacity: distortLevel > 0.1 ? 1 : 0,
@@ -274,7 +274,6 @@ export default function ProblemSection() {
             <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#ff6b6b', boxShadow: '0 0 8px rgba(255,80,80,0.8)', animation: 'flicker-dot 1.8s ease-in-out infinite' }} />
             <span className="text-[10px] tracking-[0.3em] uppercase" style={{ color: 'rgba(255,107,107,0.6)' }}>The Reality Check</span>
           </div>
-
           <div className="mb-12" style={{ lineHeight: 1.05 }}>
             {problemWords.map((word, i) => (
               <span key={i} style={{
@@ -290,7 +289,6 @@ export default function ProblemSection() {
               }}>{word.text}</span>
             ))}
           </div>
-
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" style={{
             opacity: distortLevel > 0.4 ? 1 : 0,
             transform: `translateY(${distortLevel > 0.4 ? 0 : 24}px)`,
@@ -310,8 +308,17 @@ export default function ProblemSection() {
         </div>
       </section>
 
-      {/* ═══ SCREEN 2 — 3× scroll height ═══ */}
-      <section ref={screen2Ref} className="relative" style={{ height: '340vh', background: 'transparent' }}>
+      {/* ═══════════════════════════════════════════════════
+          COMBINED — Screen 2 + Screen 3 in one scroll container.
+          Two sticky layers at identical viewport position;
+          Screen 3 (z:2) fades in over Screen 2 (z:1).
+      ═══════════════════════════════════════════════════ */}
+      <section
+        ref={combinedRef}
+        style={{ height: `${TOTAL_VH}vh`, position: 'relative', background: 'transparent' }}
+      >
+
+        {/* ── Screen 2: fades OUT ── */}
         <div
           className="sticky top-0 overflow-hidden"
           style={{
@@ -319,262 +326,188 @@ export default function ProblemSection() {
             background: '#050508',
             opacity: transitionOut ? 0 : 1,
             transition: 'opacity 1.1s cubic-bezier(0.4,0,0.2,1)',
+            zIndex: 1,
           }}
         >
-          {/* 3D canvas */}
           <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.6 }} />
-
-          {/* Deep vignette */}
-          <div className="absolute inset-0 pointer-events-none" style={{
-            background: 'radial-gradient(ellipse 90% 80% at 50% 50%, transparent 20%, rgba(5,5,8,0.75) 100%)',
-          }} />
-
-          {/* ── Horizontal light beam — cinematic reveal ── */}
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              left: 0, right: 0,
-              top: '50%',
-              height: '1px',
-              background: `linear-gradient(90deg,
-                transparent 0%,
-                rgba(201,169,110,0) 15%,
-                rgba(201,169,110,${wordProgress * 0.18}) 35%,
-                rgba(255,240,200,${wordProgress * 0.28}) 50%,
-                rgba(201,169,110,${wordProgress * 0.18}) 65%,
-                rgba(201,169,110,0) 85%,
-                transparent 100%
-              )`,
-              transform: 'translateY(-50%)',
-              transition: 'none',
-              filter: `blur(${wordProgress > 0.5 ? 0 : 1}px)`,
-            }}
-          />
-
-          {/* Bloom behind text — soft, restrained */}
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 90% 80% at 50% 50%, transparent 20%, rgba(5,5,8,0.75) 100%)' }} />
           <div className="absolute pointer-events-none" style={{
-            width: '55vw', height: '45vh',
-            left: '50%', top: '50%',
-            transform: 'translate(-50%, -50%)',
-            background: `radial-gradient(ellipse 80% 70% at 50% 50%,
-              rgba(201,169,110,${glowPulse ? 0.055 : wordProgress * 0.025}) 0%,
-              transparent 70%)`,
-            filter: 'blur(60px)',
-            transition: glowPulse ? 'background 2s ease' : 'background 0.3s ease',
+            left: 0, right: 0, top: '50%', height: '1px',
+            background: `linear-gradient(90deg, transparent 0%, rgba(201,169,110,0) 15%, rgba(201,169,110,${wordProgress * 0.18}) 35%, rgba(255,240,200,${wordProgress * 0.28}) 50%, rgba(201,169,110,${wordProgress * 0.18}) 65%, rgba(201,169,110,0) 85%, transparent 100%)`,
+            transform: 'translateY(-50%)', transition: 'none', filter: `blur(${wordProgress > 0.5 ? 0 : 1}px)`,
+          }} />
+          <div className="absolute pointer-events-none" style={{
+            width: '55vw', height: '45vh', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
+            background: `radial-gradient(ellipse 80% 70% at 50% 50%, rgba(201,169,110,${glowPulse ? 0.055 : wordProgress * 0.025}) 0%, transparent 70%)`,
+            filter: 'blur(60px)', transition: glowPulse ? 'background 2s ease' : 'background 0.3s ease',
             animation: glowPulse ? 'subtle-bloom 5s ease-in-out infinite' : 'none',
           }} />
 
-          {/* ── Main text — three cinematic lines ── */}
-          <div
-            className="absolute inset-0 flex flex-col items-center justify-center"
-            style={{ gap: 0 }}
-          >
-            {/* Eyebrow — fades in when reveal starts */}
-            <div style={{
-              marginBottom: '2.5rem',
-              opacity: wordProgress > 0.1 ? wordProgress * 0.6 : 0,
-              transition: 'none',
-              display: 'flex', alignItems: 'center', gap: '12px',
-            }}>
+          <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ gap: 0 }}>
+            <div style={{ marginBottom: '2.5rem', opacity: wordProgress > 0.1 ? wordProgress * 0.6 : 0, transition: 'none', display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{ width: '32px', height: '1px', background: 'rgba(201,169,110,0.35)' }} />
-              <span style={{
-                fontSize: '9px',
-                letterSpacing: '0.35em',
-                textTransform: 'uppercase',
-                color: 'rgba(201,169,110,0.45)',
-                fontWeight: 400,
-              }}>The Alternative</span>
+              <span style={{ fontSize: '9px', letterSpacing: '0.35em', textTransform: 'uppercase', color: 'rgba(201,169,110,0.45)', fontWeight: 400 }}>The Alternative</span>
               <div style={{ width: '32px', height: '1px', background: 'rgba(201,169,110,0.35)' }} />
             </div>
 
-            {/* Three lines */}
             {revealLines.map((line, li) => {
-              const lineStart = li / revealLines.length;
-              const lineEnd   = lineStart + 1 / revealLines.length;
+              const lineStart = li / revealLines.length, lineEnd = lineStart + 1 / revealLines.length;
               const lineP = Math.max(0, Math.min(1, (wordProgress - lineStart) / (lineEnd - lineStart)));
-              const easedLineP = easeOutExpo(lineP);
-
-              const isBrand     = line.type === 'brand';
-              const isHighlight = line.type === 'highlight';
-              const isPlain     = line.type === 'plain';
-
+              const isBrand = line.type === 'brand', isHighlight = line.type === 'highlight', isPlain = line.type === 'plain';
               return (
-                <div
-                  key={li}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'baseline',
-                    gap: isBrand ? '0.28em' : '0.22em',
-                    marginBottom: li < revealLines.length - 1 ? '0.05em' : 0,
-                    lineHeight: 1,
-                  }}
-                >
+                <div key={li} style={{ display: 'flex', alignItems: 'baseline', gap: isBrand ? '0.28em' : '0.22em', marginBottom: li < revealLines.length - 1 ? '0.05em' : 0, lineHeight: 1 }}>
                   {line.words.map((word, wi) => {
-                    /* stagger within the line */
-                    const wordStart = (wi / line.words.length) * 0.55;
-                    const wordEnd   = wordStart + 0.6;
-                    const wRaw = Math.max(0, Math.min(1, (lineP - wordStart) / (wordEnd - wordStart)));
-                    const wp2 = easeOutExpo(wRaw);
-
+                    const wordStart = (wi / line.words.length) * 0.55, wordEnd = wordStart + 0.6;
+                    const wp2 = easeOutExpo(Math.max(0, Math.min(1, (lineP - wordStart) / (wordEnd - wordStart))));
                     const isBrandWord = isBrand && word === 'MotionGrace.';
-
-                    const baseSize = isBrand
-                      ? 'clamp(3.2rem, 8.5vw, 8.5rem)'
-                      : isHighlight
-                      ? 'clamp(3.2rem, 8.5vw, 8.5rem)'
-                      : 'clamp(2rem, 5.2vw, 5rem)';
-
-                    const fw = isBrand ? 800 : isHighlight ? 700 : 300;
-
                     return (
-                      <span
-                        key={wi}
-                        style={{
-                          display: 'inline-block',
-                          fontSize: baseSize,
-                          fontWeight: fw,
-                          letterSpacing: isBrand ? '-0.035em' : isHighlight ? '-0.03em' : '-0.015em',
-                          lineHeight: 1.05,
-
-                          /* motion */
-                          opacity: wp2,
-                          transform: `
-                            translateY(${(1 - wp2) * 60}%)
-                            skewY(${(1 - wp2) * -4}deg)
-                          `,
-                          filter: `blur(${(1 - wp2) * 12}px)`,
-                          transition: 'none',
-                          willChange: 'transform, opacity, filter',
-
-                          /* color */
-                          color: isBrandWord
-                            ? 'transparent'
-                            : isHighlight
-                            ? `rgba(237,233,227,${0.55 + wp2 * 0.45})`
-                            : `rgba(237,233,227,${0.22 + wp2 * 0.38})`,
-
-                          background: isBrandWord
-                            ? 'linear-gradient(118deg, #9A7040 0%, #C9A96E 22%, #F0D898 48%, #D4AA6A 72%, #B8935A 100%)'
-                            : 'none',
-
-                          WebkitBackgroundClip: isBrandWord ? 'text' : 'unset',
-                          backgroundClip: isBrandWord ? 'text' : 'unset',
-
-                          /* subtle letter-spacing on plain words so they feel airy */
-                          marginRight: isPlain && wi < line.words.length - 1 ? '0.05em' : 0,
-                        }}
-                      >
-                        {word}
-                      </span>
+                      <span key={wi} style={{
+                        display: 'inline-block',
+                        fontSize: isBrand || isHighlight ? 'clamp(3.2rem, 8.5vw, 8.5rem)' : 'clamp(2rem, 5.2vw, 5rem)',
+                        fontWeight: isBrand ? 800 : isHighlight ? 700 : 300,
+                        letterSpacing: isBrand ? '-0.035em' : isHighlight ? '-0.03em' : '-0.015em',
+                        lineHeight: 1.05, opacity: wp2,
+                        transform: `translateY(${(1 - wp2) * 60}%) skewY(${(1 - wp2) * -4}deg)`,
+                        filter: `blur(${(1 - wp2) * 12}px)`, transition: 'none',
+                        color: isBrandWord ? 'transparent' : isHighlight ? `rgba(237,233,227,${0.55 + wp2 * 0.45})` : `rgba(237,233,227,${0.22 + wp2 * 0.38})`,
+                        background: isBrandWord ? 'linear-gradient(118deg, #9A7040 0%, #C9A96E 22%, #F0D898 48%, #D4AA6A 72%, #B8935A 100%)' : 'none',
+                        WebkitBackgroundClip: isBrandWord ? 'text' : 'unset', backgroundClip: isBrandWord ? 'text' : 'unset',
+                        marginRight: isPlain && wi < line.words.length - 1 ? '0.05em' : 0,
+                      }}>{word}</span>
                     );
                   })}
                 </div>
               );
             })}
 
-            {/* Ruled line — draws in after all words visible, reverses on backward scroll */}
-            <div style={{
-              marginTop: '3rem',
-              width: '100%',
-              maxWidth: '520px',
-              height: '1px',
-              overflow: 'hidden',
-              opacity: wordProgress > 0.88 ? Math.min(1, (wordProgress - 0.88) * 8) : 0,
-              transition: 'none',
-            }}>
-              <div style={{
-                height: '1px',
-                width: `${Math.min(100, Math.max(0, (wordProgress - 0.88) / 0.12 * 100))}%`,
-                background: 'linear-gradient(90deg, transparent 0%, rgba(201,169,110,0.2) 20%, rgba(201,169,110,0.45) 50%, rgba(201,169,110,0.2) 80%, transparent 100%)',
-                transition: 'none',
-              }} />
+            <div style={{ marginTop: '3rem', width: '100%', maxWidth: '520px', height: '1px', overflow: 'hidden', opacity: wordProgress > 0.88 ? Math.min(1, (wordProgress - 0.88) * 8) : 0, transition: 'none' }}>
+              <div style={{ height: '1px', width: `${Math.min(100, Math.max(0, (wordProgress - 0.88) / 0.12 * 100))}%`, background: 'linear-gradient(90deg, transparent 0%, rgba(201,169,110,0.2) 20%, rgba(201,169,110,0.45) 50%, rgba(201,169,110,0.2) 80%, transparent 100%)', transition: 'none' }} />
             </div>
-
-            {/* Subline — appears last */}
-            <div style={{
-              marginTop: '1.5rem',
-              opacity: wordProgress > 0.94 ? (wordProgress - 0.94) * 16 : 0,
-              transform: `translateY(${wordProgress > 0.94 ? 0 : 8}px)`,
-              transition: 'none',
-            }}>
-              <span style={{
-                fontSize: '11px',
-                letterSpacing: '0.28em',
-                textTransform: 'uppercase',
-                color: 'rgba(201,169,110,0.38)',
-                fontWeight: 400,
-              }}>AI-powered product visuals</span>
+            <div style={{ marginTop: '1.5rem', opacity: wordProgress > 0.94 ? (wordProgress - 0.94) * 16 : 0, transform: `translateY(${wordProgress > 0.94 ? 0 : 8}px)`, transition: 'none' }}>
+              <span style={{ fontSize: '11px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(201,169,110,0.38)', fontWeight: 400 }}>AI-powered product visuals</span>
             </div>
           </div>
 
-          {/* ── Minimal scroll indicator ── */}
           <div style={{
-            position: 'absolute',
-            bottom: '44px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            opacity: arrowDone
-              ? 0
-              : wordProgress > 0.72
-              ? Math.min(1, (wordProgress - 0.72) * 4)
-              : 0,
+            position: 'absolute', bottom: '44px', left: '50%', transform: 'translateX(-50%)',
+            opacity: arrowDone ? 0 : wordProgress > 0.72 ? Math.min(1, (wordProgress - 0.72) * 4) : 0,
             transition: arrowDone ? 'opacity 0.5s ease' : 'opacity 0.8s ease',
-            pointerEvents: 'none',
-            zIndex: 20,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '10px',
+            pointerEvents: 'none', zIndex: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
           }}>
-            {/* Label */}
-            <span style={{
-              fontSize: '8px',
-              letterSpacing: '0.32em',
-              textTransform: 'uppercase',
-              color: `rgba(201,169,110,${0.2 + arrowFill * 0.3})`,
-              fontWeight: 400,
-              transition: 'color 0.3s ease',
-            }}>scroll</span>
-
-            {/* Track + fill line */}
-            <div style={{
-              position: 'relative',
-              width: '1px',
-              height: '52px',
-              background: 'rgba(201,169,110,0.12)',
-            }}>
-              {/* Animated fill */}
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '1px',
-                height: `${arrowFill * 100}%`,
-                background: `rgba(201,169,110,${0.4 + arrowFill * 0.5})`,
-                transition: 'height 0.06s linear',
-                boxShadow: arrowFill > 0.7 ? '0 0 6px rgba(201,169,110,0.5)' : 'none',
-              }} />
-
-              {/* Dot at bottom of track */}
-              <div style={{
-                position: 'absolute',
-                bottom: '-3px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: '3px',
-                height: '3px',
-                borderRadius: '50%',
-                background: `rgba(201,169,110,${0.25 + arrowFill * 0.6})`,
-                transition: 'background 0.3s ease',
-              }} />
+            <span style={{ fontSize: '8px', letterSpacing: '0.32em', textTransform: 'uppercase', color: `rgba(201,169,110,${0.2 + arrowFill * 0.3})`, fontWeight: 400 }}>scroll</span>
+            <div style={{ position: 'relative', width: '1px', height: '52px', background: 'rgba(201,169,110,0.12)' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, width: '1px', height: `${arrowFill * 100}%`, background: `rgba(201,169,110,${0.4 + arrowFill * 0.5})`, transition: 'height 0.06s linear', boxShadow: arrowFill > 0.7 ? '0 0 6px rgba(201,169,110,0.5)' : 'none' }} />
+              <div style={{ position: 'absolute', bottom: '-3px', left: '50%', transform: 'translateX(-50%)', width: '3px', height: '3px', borderRadius: '50%', background: `rgba(201,169,110,${0.25 + arrowFill * 0.6})` }} />
             </div>
           </div>
 
-          {/* Edge vignettes — top and bottom */}
-          <div className="absolute inset-0 pointer-events-none" style={{
-            background: 'linear-gradient(to bottom, rgba(5,5,8,0.7) 0%, transparent 18%, transparent 82%, rgba(5,5,8,0.7) 100%)',
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(5,5,8,0.7) 0%, transparent 18%, transparent 82%, rgba(5,5,8,0.7) 100%)' }} />
+        </div>
+
+        {/* ── Screen 3: fades IN over Screen 2 ── */}
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            height: '100vh',
+            marginTop: '-100vh', /* overlap exactly with Screen 2 */
+            overflow: 'hidden',
+            background: 'linear-gradient(160deg, #03030A 0%, #060610 60%, #080508 100%)',
+            display: 'flex', flexDirection: 'column', justifyContent: 'center',
+            alignItems: 'flex-start', padding: '0 8vw',
+            opacity: transitionOut ? 1 : 0,
+            transition: 'opacity 1.1s cubic-bezier(0.4,0,0.2,1)',
+            zIndex: 2,
+            pointerEvents: transitionOut ? 'auto' : 'none',
+          }}
+        >
+          {/* Ambient top line */}
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: '1px',
+            background: `linear-gradient(90deg, transparent 0%, ${beat.accent}22 30%, ${beat.accent}55 50%, ${beat.accent}22 70%, transparent 100%)`,
+            transition: 'background 1.2s ease',
           }} />
 
+          {/* Beat counter rail */}
+          <div style={{ position: 'absolute', right: '6vw', top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
+            {STORY_BEATS.map((b, i) => (
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', opacity: i === activeBeat ? 1 : 0.2, transition: 'opacity 0.6s ease' }}>
+                <div style={{ width: i === activeBeat ? '2px' : '1px', height: i === activeBeat ? `${24 + localP * 20}px` : '14px', background: i === activeBeat ? b.accent : 'rgba(237,233,227,0.3)', transition: 'height 0.4s ease, background 0.6s ease, width 0.3s ease', borderRadius: '1px' }} />
+                <span style={{ fontSize: '8px', letterSpacing: '0.2em', color: i === activeBeat ? b.accent : 'rgba(237,233,227,0.25)', fontWeight: 400, transition: 'color 0.6s ease' }}>{String(i + 1).padStart(2,'0')}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Main content */}
+          <div style={{ width: '100%', maxWidth: '820px', position: 'relative', minHeight: '55vh', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+
+            {/* Previous beat exits upward */}
+            {prev && localP < 0.85 && (
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, opacity: Math.max(0, 1 - localP * 2), transform: `translateY(${-localP * 15}%)`, pointerEvents: 'none', transition: 'none' }}>
+                <span style={{ display: 'block', fontSize: '9px', letterSpacing: '0.38em', textTransform: 'uppercase', color: `${prev.accent}55`, marginBottom: '1.5rem', fontWeight: 400 }}>{prev.eyebrow}</span>
+                {prevHeadlineLines.map((line, li) => (
+                  <div key={li} style={{ fontSize: 'clamp(3rem, 8vw, 7.5rem)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 0.95, color: 'rgba(237,233,227,0.15)' }}>{line}</div>
+                ))}
+              </div>
+            )}
+
+            {/* Current beat enters */}
+            <div style={{ opacity: localP, transform: `translateY(${(1 - localP) * 8}%)`, transition: 'none', willChange: 'transform, opacity' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '2rem', opacity: localP > 0.2 ? 1 : 0, transition: 'none' }}>
+                <div style={{ width: `${20 + localP * 40}px`, height: '1px', background: beat.accent, transition: 'none' }} />
+                <span style={{ fontSize: '9px', letterSpacing: '0.38em', textTransform: 'uppercase', color: `${beat.accent}99`, fontWeight: 400 }}>{beat.eyebrow}</span>
+              </div>
+
+              <div style={{ marginBottom: '3rem' }}>
+                {headlineLines.map((line, li) => {
+                  const lineP = easeOutExpo(Math.max(0, Math.min(1, (localRaw - li * 0.12) / 0.65)));
+                  return (
+                    <div key={`${activeBeat}-${li}`} style={{ overflow: 'hidden', lineHeight: 0.92, marginBottom: '0.06em' }}>
+                      <span style={{
+                        display: 'block', fontSize: 'clamp(3.2rem, 8.2vw, 8rem)', fontWeight: 800,
+                        letterSpacing: '-0.04em', lineHeight: 0.92,
+                        color: li === headlineLines.length - 1 ? 'transparent' : `rgba(237,233,227,${0.6 + lineP * 0.4})`,
+                        background: li === headlineLines.length - 1 ? `linear-gradient(118deg, ${beat.accent}99 0%, ${beat.accent} 40%, #F0D898 60%, ${beat.accent} 80%)` : 'none',
+                        WebkitBackgroundClip: li === headlineLines.length - 1 ? 'text' : 'unset',
+                        backgroundClip: li === headlineLines.length - 1 ? 'text' : 'unset',
+                        transform: `translateY(${(1 - lineP) * 110}%) skewY(${(1 - lineP) * -3}deg)`,
+                        opacity: lineP, filter: `blur(${(1 - lineP) * 10}px)`, transition: 'none',
+                      }}>{line}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ height: '1px', width: `${localP * 100}%`, background: `linear-gradient(90deg, ${beat.accent}55 0%, ${beat.accent}11 100%)`, marginBottom: '2rem', transition: 'none' }} />
+
+              <p style={{
+                fontSize: 'clamp(0.95rem, 1.6vw, 1.15rem)', lineHeight: 1.75,
+                color: `rgba(237,233,227,${0.2 + localP * 0.45})`,
+                fontWeight: 300, maxWidth: '580px', letterSpacing: '0.01em', margin: 0,
+              }}>{beat.body}</p>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '2px', background: 'rgba(237,233,227,0.05)' }}>
+            <div style={{ height: '100%', width: `${counterProgress * 100}%`, background: `linear-gradient(90deg, ${STORY_BEATS[0].accent} 0%, ${beat.accent} 100%)`, transition: 'width 0.08s linear, background 1s ease', boxShadow: `0 0 12px ${beat.accent}55` }} />
+          </div>
+
+          {/* Scroll hint at story start */}
+          <div style={{
+            position: 'absolute', bottom: '44px', left: '8vw',
+            opacity: storyProgress < 0.04 ? 1 : 0, transition: 'opacity 0.6s ease',
+            display: 'flex', alignItems: 'center', gap: '12px', pointerEvents: 'none',
+          }}>
+            <div style={{ width: '1px', height: '36px', background: 'rgba(201,169,110,0.2)', position: 'relative' }}>
+              <div style={{ position: 'absolute', top: 0, width: '1px', height: '40%', background: 'rgba(201,169,110,0.7)', animation: 'scrollDrop 1.8s ease-in-out infinite' }} />
+            </div>
+            <span style={{ fontSize: '8px', letterSpacing: '0.3em', textTransform: 'uppercase', color: 'rgba(201,169,110,0.35)' }}>scroll to explore</span>
+          </div>
+
+          {/* Grain + vignette */}
+          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.025, backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`, backgroundSize: '140px 140px' }} />
+          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(to bottom, rgba(3,3,10,0.65) 0%, transparent 20%, transparent 80%, rgba(3,3,10,0.65) 100%)' }} />
         </div>
       </section>
 
@@ -613,6 +546,11 @@ export default function ProblemSection() {
         @keyframes subtle-bloom {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.55; }
+        }
+        @keyframes scrollDrop {
+          0% { top: 0; opacity: 1; }
+          70% { top: 60%; opacity: 0.3; }
+          100% { top: 0; opacity: 1; }
         }
       `}</style>
     </>
