@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 
 const navLinks = [
   { label: 'Work', href: '#showreel' },
@@ -39,6 +40,7 @@ const budgetOptions = [
 ];
 
 export default function Header() {
+  const router = useRouter();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
@@ -312,10 +314,10 @@ export default function Header() {
 
           {/* Right side */}
           <div className="flex items-center gap-2">
-            {/* Contact Us — desktop */}
-            <button onClick={handleContactOpen} className="hidden md:flex items-center gap-2 px-5 py-2.5 rounded-full text-[10px] font-semibold uppercase text-primary-foreground bg-primary hover:opacity-90 transition-all duration-700 animate-pulse-gold" aria-label="Open contact form">
-              Contact Us
-            </button>
+            {/* Add Project — desktop */}
+            <Link href="/add-project" className="hidden md:flex items-center gap-2 px-5 py-2.5 rounded-full text-[10px] font-semibold uppercase text-primary-foreground bg-primary hover:opacity-90 transition-all duration-700 animate-pulse-gold" aria-label="Add a new project">
+              Add Project
+            </Link>
 
             {/* Book a Call — desktop 
             <button
@@ -380,10 +382,10 @@ export default function Header() {
 
           {/* Buttons */}
           <div className="mobile-nav-item flex flex-col items-center gap-3" style={{ transitionDelay: `${80 + navLinks.length * 55}ms` }}>
-            <button onClick={handleContactOpen} className="mobile-contact-btn">
+            <Link href="/add-project" className="mobile-contact-btn" onClick={() => setMenuOpen(false)}>
               <span className="pulse-dot" />
-              Contact Us
-            </button>
+              Add Project
+            </Link>
             <button
               onClick={() => handleLinkClick('#cta')}
               className="px-9 py-3.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] text-primary-foreground bg-primary hover:opacity-90 transition-all duration-700 animate-pulse-gold"
