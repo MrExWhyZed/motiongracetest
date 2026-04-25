@@ -2,7 +2,6 @@
 
 import React, { useRef, useEffect } from 'react';
 import AppImage from '@/components/ui/AppImage';
-import Link from 'next/link';
 
 export default function CTASection() {
   const bgRef = useRef<HTMLDivElement>(null);
@@ -27,6 +26,10 @@ export default function CTASection() {
       cancelAnimationFrame(rafId);
     };
   }, []);
+
+  const handleBookCall = () => {
+    window.open('mailto:hello@motiongrace.studio?subject=Book a Call', '_blank');
+  };
 
   return (
     <section
@@ -87,14 +90,14 @@ export default function CTASection() {
           data-delay="450"
           className="flex flex-col sm:flex-row gap-4 justify-center">
 
-          <Link
-            href="/add-project"
+          <button
+            onClick={handleBookCall}
             className="group relative px-10 py-4 rounded-full text-xs font-semibold uppercase tracking-[0.18em] text-primary-foreground bg-primary hover:opacity-95 transition-all duration-700 animate-pulse-gold overflow-hidden">
-            <span className="relative z-10">Add Project</span>
+            <span className="relative z-10">Book a Call</span>
             <div className="absolute inset-0 overflow-hidden opacity-0 group-hover:opacity-100">
               <div className="absolute top-0 left-0 w-1/4 h-full bg-gold-shimmer animate-light-sweep" />
             </div>
-          </Link>
+          </button>
 
           <button
             onClick={() => {
@@ -121,11 +124,11 @@ export default function CTASection() {
 
       {/* Mobile sticky CTA */}
       <div className="sticky-cta-mobile sm:hidden">
-        <Link
-          href="/add-project"
+        <button
+          onClick={handleBookCall}
           className="px-8 py-3.5 rounded-full text-xs font-semibold uppercase tracking-[0.18em] text-primary-foreground bg-primary shadow-2xl animate-pulse-gold">
-          Add Project
-        </Link>
+          Book a Call
+        </button>
       </div>
     </section>
   );

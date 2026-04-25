@@ -57,10 +57,7 @@
     "react": "19.0.3",
     "react-dom": "19.0.3",
     "recharts": "^2.15.2",
-    "lucide-react": "^1.7.0",
-    "@supabase/supabase-js": "latest",
-    "gsap": "latest",
-    "react-hook-form": "^7.73.1"
+    "lucide-react": "^1.7.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
