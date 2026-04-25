@@ -834,7 +834,7 @@ export default function HeroSection() {
             <div
               ref={storyScreen1Ref}
               className="relative overflow-hidden flex flex-col justify-center px-6 sm:px-10"
-              style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, rgba(4,4,10,0.88) 0%, rgba(8,8,16,0.88) 50%, rgba(10,5,8,0.88) 100%)' }}
+              style={{ minHeight: '100vh', background: 'transparent' }}
             >
               <div className="absolute inset-0 pointer-events-none" style={{
                 opacity: 0.04 + sDistortLevel * 0.03,
@@ -903,14 +903,14 @@ export default function HeroSection() {
               <div
                 className="sticky top-0 overflow-hidden"
                 style={{
-                  height: '100vh', background: 'rgba(5,5,8,0.88)',
+                  height: '100vh', background: 'transparent',
                   opacity: sTransitionOut ? 0 : 1,
                   transition: 'opacity 1.1s cubic-bezier(0.4,0,0.2,1)',
                   zIndex: 1,
                 }}
               >
                 <canvas ref={storyCanvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', opacity: 0.6 }} />
-                <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse 90% 80% at 50% 50%, transparent 20%, rgba(5,5,8,0.75) 100%)' }} />
+                <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse 90% 80% at 50% 50%, transparent 20%, rgba(0,0,0,0.3) 100%)' }} />
                 <div style={{
                   position: 'absolute', left: 0, right: 0, top: '50%', height: '1px',
                   background: `linear-gradient(90deg, transparent 0%, rgba(201,169,110,0) 15%, rgba(201,169,110,${sWordProgress * 0.18}) 35%, rgba(255,240,200,${sWordProgress * 0.28}) 50%, rgba(201,169,110,${sWordProgress * 0.18}) 65%, rgba(201,169,110,0) 85%, transparent 100%)`,
@@ -957,7 +957,7 @@ export default function HeroSection() {
                     <div style={{ position: 'absolute', bottom: '-3px', left: '50%', transform: 'translateX(-50%)', width: '3px', height: '3px', borderRadius: '50%', background: `rgba(201,169,110,${0.25 + sArrowFill * 0.6})` }} />
                   </div>
                 </div>
-                <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(to bottom, rgba(5,5,8,0.7) 0%, transparent 18%, transparent 82%, rgba(5,5,8,0.7) 100%)' }} />
+                <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 18%, transparent 82%, rgba(0,0,0,0.3) 100%)' }} />
               </div>
 
               {/* ── Screen 3: story beats, fades IN over Screen 2 ── */}
@@ -965,7 +965,7 @@ export default function HeroSection() {
                 position: 'sticky', top: 0, height: '100vh',
                 marginTop: '-100vh',
                 overflow: 'hidden',
-                background: 'linear-gradient(160deg, rgba(3,3,10,0.9) 0%, rgba(6,6,16,0.9) 60%, rgba(8,5,8,0.9) 100%)',
+                background: 'transparent',
                 display: 'flex', flexDirection: 'column', justifyContent: 'center',
                 alignItems: 'flex-start', padding: '0 8vw',
                 opacity: sTransitionOut ? 1 : 0,
@@ -1042,7 +1042,7 @@ export default function HeroSection() {
 
                 {/* Grain + vignette */}
                 <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.025, backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`, backgroundSize: '140px 140px' }} />
-                <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(to bottom, rgba(3,3,10,0.65) 0%, transparent 20%, transparent 80%, rgba(3,3,10,0.65) 100%)' }} />
+                <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, transparent 20%, transparent 80%, rgba(0,0,0,0.2) 100%)' }} />
               </div>
 
             </div>{/* end combined */}
