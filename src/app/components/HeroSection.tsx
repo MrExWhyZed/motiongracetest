@@ -62,6 +62,7 @@ export default function HeroSection() {
   const [storyExiting,   setStoryExiting]   = useState(false);
   const [viewBtnHovered, setViewBtnHovered] = useState(false);
   const storyScrollRef   = useRef<HTMLDivElement>(null);
+  const storyOpenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* Story: "The Problem" title phase */
   const [titlePhase, setTitlePhase] = useState<'hidden'|'in'|'shown'>('hidden');
@@ -383,12 +384,12 @@ export default function HeroSection() {
     el.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
 
-    /* Detect extra wheel events past the end → close overlay */
+    /* Detect extra wheel past the end → close overlay after ~3 deliberate scrolls */
     const handleWheel = (e: WheelEvent) => {
       const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
       if (atBottom && e.deltaY > 0) {
-        storyEndScrollRef.current += 1;
-        if (storyEndScrollRef.current >= 3) {
+        storyEndScrollRef.current += Math.abs(e.deltaY);
+        if (storyEndScrollRef.current >= 600) {   // ~3 trackpad swipes or mouse wheel clicks
           storyEndScrollRef.current = 0;
           closeStory();
         }
@@ -743,8 +744,8 @@ export default function HeroSection() {
             transition: 'opacity 1s ease 1.8s, transform 1s ease 1.8s',
           }}>
           <button
-            onMouseEnter={() => { setViewBtnHovered(true); openStory(); }}
-            onMouseLeave={() => setViewBtnHovered(false)}
+            onMouseEnter={() => { setViewBtnHovered(true); storyOpenTimerRef.current = setTimeout(openStory, 720); }}
+            onMouseLeave={() => { setViewBtnHovered(false); if (storyOpenTimerRef.current) { clearTimeout(storyOpenTimerRef.current); storyOpenTimerRef.current = null; } }}
             className="view-story-btn"
             aria-label="View our story"
           >
