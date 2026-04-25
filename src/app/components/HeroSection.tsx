@@ -97,6 +97,17 @@ export default function HeroSection() {
   const [sVisibleLines,  setSVisibleLines]  = useState<boolean[]>(new Array(12).fill(false));
   const [sDistortLevel,  setSDistortLevel]  = useState(0);
   const storyScreen1Ref  = useRef<HTMLDivElement>(null);
+  const storyEndScrollRef = useRef(0); // counts wheel ticks past the end
+
+  /* Lock / unlock main page scroll while overlay is open */
+  useEffect(() => {
+    if (storyOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [storyOpen]);
 
   /* Subheading typing state */
   const [subIndex, setSubIndex]       = useState(0);
@@ -225,6 +236,7 @@ export default function HeroSection() {
     setSArrowDone(false); setSTransitionOut(false); setSStoryProgress(0);
     setSVisibleLines(new Array(12).fill(false)); setSDistortLevel(0);
     requestAnimationFrame(() => requestAnimationFrame(() => setStoryVisible(true)));
+    storyEndScrollRef.current = 0;
     setTimeout(() => setTitlePhase('in'), 500);
     setTimeout(() => setTitlePhase('shown'), 1400);
   };
@@ -370,8 +382,25 @@ export default function HeroSection() {
     };
     el.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
+
+    /* Detect extra wheel events past the end → close overlay */
+    const handleWheel = (e: WheelEvent) => {
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
+      if (atBottom && e.deltaY > 0) {
+        storyEndScrollRef.current += 1;
+        if (storyEndScrollRef.current >= 3) {
+          storyEndScrollRef.current = 0;
+          closeStory();
+        }
+      } else if (!atBottom) {
+        storyEndScrollRef.current = 0;
+      }
+    };
+    el.addEventListener('wheel', handleWheel, { passive: true });
+
     return () => {
       el.removeEventListener('scroll', handleScroll);
+      el.removeEventListener('wheel', handleWheel);
       if (storyGlowTimerRef.current !== null) clearTimeout(storyGlowTimerRef.current);
     };
   }, [storyOpen]);
