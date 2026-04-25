@@ -333,11 +333,10 @@ export default function HeroSection() {
     const el = storyScrollRef.current;
     if (!el) return;
     const handleScroll = () => {
-      // Screen 1 — problem words
+      // Screen 1 — exact same logic as ProblemSection
       if (storyScreen1Ref.current) {
-        const s1 = storyScreen1Ref.current;
-        const s1Top = s1.offsetTop - el.scrollTop;
-        const prog = Math.max(0, Math.min(1, 1 - s1Top / window.innerHeight));
+        const rect = storyScreen1Ref.current.getBoundingClientRect();
+        const prog = Math.max(0, Math.min(1, 1 - rect.top / window.innerHeight));
         const PROBLEM_WORDS_COUNT = 12;
         setSVisibleLines(Array.from({length: PROBLEM_WORDS_COUNT}, (_, i) => prog > (i / PROBLEM_WORDS_COUNT) * 0.7));
         setSDistortLevel(Math.min(prog * 1.5, 1));
@@ -345,8 +344,9 @@ export default function HeroSection() {
 
       const combined = storyCombinedRef.current;
       if (!combined) return;
-      const scrolled = el.scrollTop - combined.offsetTop;
-      const total    = combined.offsetHeight - window.innerHeight;
+      const rect  = combined.getBoundingClientRect();
+      const total = combined.offsetHeight - window.innerHeight;
+      const scrolled = -rect.top;
       const raw      = Math.max(0, Math.min(1, total > 0 ? scrolled / total : 0));
 
       const s2Raw = Math.max(0, Math.min(1, raw / S2_FRAC_S));
@@ -714,8 +714,7 @@ export default function HeroSection() {
             transition: 'opacity 1s ease 1.8s, transform 1s ease 1.8s',
           }}>
           <button
-            onClick={openStory}
-            onMouseEnter={() => setViewBtnHovered(true)}
+            onMouseEnter={() => { setViewBtnHovered(true); openStory(); }}
             onMouseLeave={() => setViewBtnHovered(false)}
             className="view-story-btn"
             aria-label="View our story"
@@ -802,77 +801,66 @@ export default function HeroSection() {
               </div>
             </div>
 
-            {/* ════ SCREEN 1: problem words + pain cards ════ */}
+            {/* ════ SCREEN 1: exact copy from ProblemSection ════ */}
             <div
               ref={storyScreen1Ref}
-              style={{
-                position: 'relative', overflow: 'hidden',
-                display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                padding: '0 6vw', minHeight: '100vh',
-                background: 'linear-gradient(to bottom, #04040A 0%, #080810 50%, #0A0508 100%)',
-              }}
+              className="relative overflow-hidden flex flex-col justify-center px-6 sm:px-10"
+              style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, rgba(4,4,10,0.88) 0%, rgba(8,8,16,0.88) 50%, rgba(10,5,8,0.88) 100%)' }}
             >
-              {/* Noise */}
-              <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.04 + sDistortLevel * 0.03, backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`, backgroundSize: '150px 150px' }} />
-
-              <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '96vw', margin: '0 auto', padding: '5rem 0' }}>
-                {/* Eyebrow */}
-                <div style={{
-                  marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '10px',
+              <div className="absolute inset-0 pointer-events-none" style={{
+                opacity: 0.04 + sDistortLevel * 0.03,
+                backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+                backgroundSize: '150px 150px', animation: 'noise-shift 0.5s steps(3) infinite',
+              }} />
+              <div className="relative z-10 w-full py-20" style={{ maxWidth: '96vw', margin: '0 auto' }}>
+                <div className="mb-8 flex items-center gap-3" style={{
                   opacity: sDistortLevel > 0.1 ? 1 : 0,
                   transform: `translateY(${sDistortLevel > 0.1 ? 0 : 16}px)`,
                   transition: 'all 0.8s cubic-bezier(0.16,1,0.3,1)',
                 }}>
-                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ff6b6b', boxShadow: '0 0 8px rgba(255,80,80,0.8)', animation: 'sFlickerDot 1.8s ease-in-out infinite', flexShrink: 0 }} />
-                  <span style={{ fontSize: '10px', letterSpacing: '0.3em', textTransform: 'uppercase', color: 'rgba(255,107,107,0.6)', fontFamily: 'var(--font-sans)' }}>The Reality Check</span>
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#ff6b6b', boxShadow: '0 0 8px rgba(255,80,80,0.8)', animation: 'flicker-dot 1.8s ease-in-out infinite' }} />
+                  <span className="text-[10px] tracking-[0.3em] uppercase" style={{ color: 'rgba(255,107,107,0.6)' }}>The Reality Check</span>
                 </div>
-
-                {/* Problem words */}
-                <div style={{ lineHeight: 1.05, marginBottom: '3rem' }}>
+                <div className="mb-12" style={{ lineHeight: 1.05 }}>
                   {[
-                    { text: 'Your',         accent: false },
-                    { text: 'product',      accent: false },
-                    { text: 'shoots',       accent: false },
-                    { text: 'take',         accent: false },
-                    { text: '6 weeks.',     accent: true  },
-                    { text: 'Cost you',     accent: false },
-                    { text: '$80,000.',     accent: true  },
-                    { text: 'Deliver',      accent: false },
-                    { text: '20 assets.',   accent: true  },
-                    { text: 'And go',       accent: false },
-                    { text: 'out of date',  accent: false },
-                    { text: 'in months.',   accent: true  },
+                    { text: 'Your', accent: false }, { text: 'product', accent: false },
+                    { text: 'shoots', accent: false }, { text: 'take', accent: false },
+                    { text: '6 weeks.', accent: true }, { text: 'Cost you', accent: false },
+                    { text: '$80,000.', accent: true }, { text: 'Deliver', accent: false },
+                    { text: '20 assets.', accent: true }, { text: 'And go', accent: false },
+                    { text: 'out of date', accent: false }, { text: 'in months.', accent: true },
                   ].map((word, i) => (
                     <span key={i} style={{
-                      fontSize: 'clamp(2.2rem, 6vw, 6rem)', fontWeight: word.accent ? 800 : 300,
-                      letterSpacing: '-0.025em', color: word.accent ? '#ff6b6b' : 'rgba(237,233,227,0.88)',
-                      display: 'inline-block',
+                      fontSize: 'clamp(2.8rem, 7.2vw, 7rem)', fontWeight: word.accent ? 800 : 300,
+                      letterSpacing: '-0.03em', color: word.accent ? '#ff6b6b' : 'rgba(237,233,227,0.88)',
                       transform: sVisibleLines[i] ? 'translateY(0)' : 'translateY(110%)',
                       opacity: sVisibleLines[i] ? 1 : 0,
-                      transition: `transform 0.7s cubic-bezier(0.16,1,0.3,1) ${i * 0.04}s, opacity 0.5s ease ${i * 0.04}s`,
-                      marginRight: '0.22em',
-                      textShadow: word.accent ? '0 0 30px rgba(255,80,80,0.4)' : 'none',
+                      transition: `transform 0.7s cubic-bezier(0.16,1,0.3,1) ${i * 0.06}s, opacity 0.5s ease ${i * 0.06}s`,
+                      display: 'inline-block', textShadow: word.accent ? '0 0 40px rgba(255,80,80,0.4)' : 'none',
+                      filter: word.accent && sDistortLevel > 0.6 ? 'drop-shadow(0 0 8px rgba(255,80,80,0.55))' : 'none',
+                      animation: word.accent && sDistortLevel > 0.7 ? 'glitch-text 3s ease-in-out infinite' : 'none',
+                      marginRight: '0.25em',
                     }}>{word.text}</span>
                   ))}
                 </div>
-
-                {/* Pain cards */}
-                <div style={{
-                  display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px',
-                  maxWidth: '680px',
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" style={{
                   opacity: sDistortLevel > 0.4 ? 1 : 0,
                   transform: `translateY(${sDistortLevel > 0.4 ? 0 : 24}px)`,
                   transition: 'all 1s cubic-bezier(0.16,1,0.3,1) 0.2s',
                 }}>
                   {[
-                    { label: 'Studio rental',       value: '$4,200/day', color: '#ff6b6b' },
-                    { label: 'Photographer fees',    value: '$8,000+',    color: '#ffa94d' },
-                    { label: 'Reshoots & revisions', value: 'Endless',    color: '#ff6b6b' },
-                    { label: 'Final asset count',    value: '≈20 images', color: '#ffa94d' },
-                  ].map((p, i) => (
-                    <div key={i} style={{ borderRadius: '12px', padding: '1.1rem 1.25rem', background: 'rgba(255,80,80,0.03)', border: '1px solid rgba(255,80,80,0.1)' }}>
-                      <div style={{ fontSize: '9px', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(237,233,227,0.3)', marginBottom: '0.4rem', fontFamily: 'var(--font-sans)' }}>{p.label}</div>
-                      <div style={{ fontSize: '1.4rem', fontWeight: 700, color: p.color, textShadow: `0 0 20px ${p.color}60` }}>{p.value}</div>
+                    { label: 'Studio rental', value: '$4,200/day', color: '#ff6b6b' },
+                    { label: 'Photographer fees', value: '$8,000+', color: '#ffa94d' },
+                    { label: 'Reshoots & revisions', value: 'Endless', color: '#ff6b6b' },
+                    { label: 'Final asset count', value: '≈20 images', color: '#ffa94d' },
+                  ].map((point, i) => (
+                    <div key={i} className="rounded-xl p-5 relative overflow-hidden" style={{
+                      background: 'rgba(255,80,80,0.03)', border: '1px solid rgba(255,80,80,0.1)',
+                      animation: `pain-flicker ${2 + i * 0.7}s ease-in-out infinite, widget-float ${6 + i * 1.1}s ease-in-out infinite`,
+                      animationDelay: `${i * 0.4}s, ${i * 0.7}s`, boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                    }}>
+                      <div className="text-[9px] tracking-widest uppercase mb-2" style={{ color: 'rgba(237,233,227,0.3)' }}>{point.label}</div>
+                      <div className="text-2xl font-bold" style={{ color: point.color, textShadow: `0 0 20px ${point.color}60`, animation: 'value-flicker 2.5s ease-in-out infinite', animationDelay: `${i * 0.3}s` }}>{point.value}</div>
                     </div>
                   ))}
                 </div>
@@ -886,7 +874,7 @@ export default function HeroSection() {
               <div
                 className="sticky top-0 overflow-hidden"
                 style={{
-                  height: '100vh', background: '#050508',
+                  height: '100vh', background: 'rgba(5,5,8,0.88)',
                   opacity: sTransitionOut ? 0 : 1,
                   transition: 'opacity 1.1s cubic-bezier(0.4,0,0.2,1)',
                   zIndex: 1,
@@ -948,7 +936,7 @@ export default function HeroSection() {
                 position: 'sticky', top: 0, height: '100vh',
                 marginTop: '-100vh',
                 overflow: 'hidden',
-                background: 'linear-gradient(160deg, #03030A 0%, #060610 60%, #080508 100%)',
+                background: 'linear-gradient(160deg, rgba(3,3,10,0.9) 0%, rgba(6,6,16,0.9) 60%, rgba(8,5,8,0.9) 100%)',
                 display: 'flex', flexDirection: 'column', justifyContent: 'center',
                 alignItems: 'flex-start', padding: '0 8vw',
                 opacity: sTransitionOut ? 1 : 0,
@@ -1309,7 +1297,10 @@ export default function HeroSection() {
         /* ── Story Overlay ───────────────────────────────── */
         .story-overlay {
           position: fixed; inset: 0; z-index: 9990;
-          background: #000; overflow: hidden;
+          background: rgba(0,0,0,0.82);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          overflow: hidden;
         }
         .story-close-btn {
           position: fixed; top: 1.75rem; right: 1.75rem;
@@ -1338,7 +1329,7 @@ export default function HeroSection() {
           width: 100vw; height: 100vh;
           position: relative; display: flex;
           align-items: center; justify-content: center;
-          background: #000; flex-direction: column;
+          background: transparent; flex-direction: column;
         }
         .story-noise {
           position: absolute; inset: 0; pointer-events: none; opacity: 0.04;
@@ -1374,10 +1365,36 @@ export default function HeroSection() {
           70%  { top: 60%; opacity: 0.3; }
           100% { top: 0;   opacity: 1; }
         }
-        @keyframes sFlickerDot {
+        @keyframes noise-shift {
+          0%   { background-position: 0 0 }
+          33%  { background-position: -8px 12px }
+          66%  { background-position: 5px -8px }
+          100% { background-position: 0 0 }
+        }
+        @keyframes flicker-dot {
           0%, 100% { opacity: 1; transform: scale(1); }
-          40%      { opacity: 0.3; transform: scale(0.7); }
-          60%      { opacity: 0.8; transform: scale(1.2); }
+          40% { opacity: 0.3; transform: scale(0.7); }
+          60% { opacity: 0.8; transform: scale(1.2); }
+        }
+        @keyframes glitch-text {
+          0%, 90%, 100% { transform: translateX(0); filter: none; }
+          92% { transform: translateX(-3px); filter: hue-rotate(15deg); }
+          94% { transform: translateX(3px); filter: hue-rotate(-15deg); }
+          96% { transform: translateX(-2px); filter: hue-rotate(10deg); }
+        }
+        @keyframes pain-flicker {
+          0%, 95%, 100% { opacity: 1; border-color: rgba(255,80,80,0.1); }
+          97% { opacity: 0.85; border-color: rgba(255,80,80,0.2); }
+        }
+        @keyframes widget-float {
+          0%, 100% { transform: translateY(0px); }
+          40% { transform: translateY(-8px); }
+          70% { transform: translateY(-4px); }
+        }
+        @keyframes value-flicker {
+          0%, 88%, 100% { opacity: 1; }
+          90% { opacity: 0.6; }
+          93% { opacity: 1; }
         }
         @keyframes subtle-bloom {
           0%, 100% { opacity: 1; }
