@@ -33,11 +33,12 @@ export default function HomePage() {
       {/* 4. Process — clarity / structure / sticky storytelling */}
       <ProcessSection />
 
+      {/* 6. Showcase — premium auto-scroll with 3D tilt + depth */}
+      <ShowcaseSection />
+
       {/* 5. Transformation — before vs after, the upgrade */}
       <TransformationSection />
 
-      {/* 6. Showcase — premium auto-scroll with 3D tilt + depth */}
-      <ShowcaseSection />
 
       {/* 7. Testimonials — floating, drifting, alive social proof */}
       <FloatingTestimonialsSection />
