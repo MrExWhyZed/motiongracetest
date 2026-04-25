@@ -192,6 +192,7 @@ export default function FloatingTestimonialsSection() {
   return (
     <section
       ref={sectionRef}
+      data-gsap-section="default"
       className="relative overflow-hidden py-32 sm:py-48 px-6 sm:px-10"
       style={{
         background: 'linear-gradient(to bottom, #0A0C16 0%, #06060C 100%)',

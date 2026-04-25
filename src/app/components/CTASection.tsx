@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import AppImage from '@/components/ui/AppImage';
+import Link from 'next/link';
 
 export default function CTASection() {
   const bgRef = useRef<HTMLDivElement>(null);
@@ -27,13 +28,10 @@ export default function CTASection() {
     };
   }, []);
 
-  const handleBookCall = () => {
-    window.open('mailto:hello@motiongrace.studio?subject=Book a Call', '_blank');
-  };
-
   return (
     <section
       id="cta"
+      data-gsap-section="default"
       className="relative min-h-[80vh] flex items-center justify-center overflow-hidden px-6 sm:px-10 py-28 sm:py-40">
 
       {/* Background */}
@@ -90,16 +88,18 @@ export default function CTASection() {
           data-delay="450"
           className="flex flex-col sm:flex-row gap-4 justify-center">
 
-          <button
-            onClick={handleBookCall}
+          <Link
+            href="/add-project"
+            data-gsap-button="primary"
             className="group relative px-10 py-4 rounded-full text-xs font-semibold uppercase tracking-[0.18em] text-primary-foreground bg-primary hover:opacity-95 transition-all duration-700 animate-pulse-gold overflow-hidden">
-            <span className="relative z-10">Book a Call</span>
+            <span className="relative z-10">Add Project</span>
             <div className="absolute inset-0 overflow-hidden opacity-0 group-hover:opacity-100">
               <div className="absolute top-0 left-0 w-1/4 h-full bg-gold-shimmer animate-light-sweep" />
             </div>
-          </button>
+          </Link>
 
           <button
+            data-gsap-button="secondary"
             onClick={() => {
               document.querySelector('#showreel')?.scrollIntoView({ behavior: 'smooth' });
             }}
@@ -124,11 +124,11 @@ export default function CTASection() {
 
       {/* Mobile sticky CTA */}
       <div className="sticky-cta-mobile sm:hidden">
-        <button
-          onClick={handleBookCall}
+        <Link
+          href="/add-project"
           className="px-8 py-3.5 rounded-full text-xs font-semibold uppercase tracking-[0.18em] text-primary-foreground bg-primary shadow-2xl animate-pulse-gold">
-          Book a Call
-        </button>
+          Add Project
+        </Link>
       </div>
     </section>
   );

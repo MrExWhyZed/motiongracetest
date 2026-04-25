@@ -41,6 +41,7 @@ export default function HeroBridge() {
   return (
     <div
       ref={bridgeRef}
+      data-gsap-section="bridge"
       className="relative pointer-events-none overflow-hidden"
       style={{
         height: '180px',

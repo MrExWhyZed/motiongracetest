@@ -4,7 +4,7 @@ import AppLogo from '@/components/ui/AppLogo';
 
 export default function Footer() {
   return (
-    <footer className="border-t border-border/30 py-20 px-6 sm:px-10">
+    <footer data-gsap-section="footer" className="border-t border-border/30 py-20 px-6 sm:px-10">
       <div className="max-w-7xl mx-auto">
         {/* Section divider */}
         <div className="section-divider mb-16" />

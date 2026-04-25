@@ -525,7 +525,7 @@ export default function ServicesSection() {
   }, []);
 
   return (
-    <section id="services" className="relative py-16 sm:py-24 px-6 sm:px-10 overflow-hidden" style={{
+    <section id="services" data-gsap-section="default" className="relative py-16 sm:py-24 px-6 sm:px-10 overflow-hidden" style={{
       background: 'linear-gradient(to bottom, #06060E 0%, #080812 30%, #07071040 60%, var(--background) 100%)',
     }}>
 
