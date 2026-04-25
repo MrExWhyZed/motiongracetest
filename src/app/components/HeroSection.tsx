@@ -228,24 +228,49 @@ export default function HeroSection() {
   }, [heroVisible, hlPhase]);
 
   /* ── Story overlay: open / close ────────────────────────────────────── */
+  const [storyFlickerOpacity, setStoryFlickerOpacity] = useState(0);
+
   const openStory = () => {
     setStoryOpen(true);
     setStoryVisible(false);
+    setStoryFlickerOpacity(0);
     setStoryExiting(false);
     setTitlePhase('hidden');
     setSWordProgress(0); setSGlowPulse(false); setSArrowFill(0);
     setSArrowDone(false); setSTransitionOut(false); setSStoryProgress(0);
     setSVisibleLines(new Array(12).fill(false)); setSDistortLevel(0);
-    requestAnimationFrame(() => requestAnimationFrame(() => setStoryVisible(true)));
     storyEndScrollRef.current = 0;
-    setTimeout(() => setTitlePhase('in'), 500);
-    setTimeout(() => setTitlePhase('shown'), 1400);
+
+    // CRT flicker sequence: rapid on/off then lock on
+    const flicker = [
+      [0,   1],   // flash on
+      [60,  0],   // off
+      [110, 1],   // on
+      [150, 0],   // off
+      [190, 0.7], // dim on
+      [230, 0],   // off
+      [260, 1],   // on
+      [300, 0],   // off
+      [330, 0.5], // half
+      [360, 0],   // off
+      [400, 1],   // LOCK ON — stay
+    ] as [number, number][];
+
+    flicker.forEach(([delay, val]) => {
+      setTimeout(() => setStoryFlickerOpacity(val), delay);
+    });
+
+    // Mark fully visible after flicker settles
+    setTimeout(() => setStoryVisible(true), 420);
+    setTimeout(() => setTitlePhase('in'), 600);
+    setTimeout(() => setTitlePhase('shown'), 1500);
   };
 
   const closeStory = () => {
     setStoryExiting(true);
     setTimeout(() => {
       setStoryOpen(false); setStoryExiting(false); setStoryVisible(false);
+      setStoryFlickerOpacity(0);
       setTitlePhase('hidden');
       setSWordProgress(0); setSGlowPulse(false); setSArrowFill(0);
       setSArrowDone(false); setSTransitionOut(false); setSStoryProgress(0);
@@ -789,8 +814,8 @@ export default function HeroSection() {
         <div
           className="story-overlay"
           style={{
-            opacity: storyExiting ? 0 : storyVisible ? 1 : 0,
-            transition: 'opacity 0.7s cubic-bezier(0.4,0,0.2,1)',
+            opacity: storyExiting ? 0 : storyFlickerOpacity,
+            transition: storyExiting ? 'opacity 0.7s cubic-bezier(0.4,0,0.2,1)' : storyVisible ? 'none' : 'none',
           }}
         >
           {/* ── Close button (fixed top-right) ── */}
